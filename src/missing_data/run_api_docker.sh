@@ -16,12 +16,17 @@ if [ "$(docker ps -aq -f name=missing-data-api-container)" ]; then
     docker rm -f missing-data-api-container
 fi
 
-# 3. Run the container
-# If running locally without docker-compose, use --network="host" to hit localhost DB
-# However, Mac OS Docker doesn't support host networking correctly out of the box for hitting other containers via localhost
-# So we pass DB_HOST=host.docker.internal to allow Python inside this container to talk to the DB container!
+# 3. Run the container and link it to the DB container explicitly!
+# By using --link or putting them on the same custom network, we avoid the localhost/host.docker.internal trap entirely.
+# We will use the container name `case-db` as the host.
+
 echo "[INFO] Starting container on port 8000..."
-docker run -d --name missing-data-api-container -e DB_HOST=host.docker.internal -p 8000:8000 missing-data-api
+docker run -d \
+    --name missing-data-api-container \
+    --link case-db:case-db \
+    -e DB_HOST=case-db \
+    -p 8000:8000 \
+    missing-data-api
 
 echo "================================================="
 echo " ✅ Python API is now running in Docker!         "

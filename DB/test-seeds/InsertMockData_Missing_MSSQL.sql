@@ -1,24 +1,30 @@
 -- =======================================================
--- Mock Data with MISSING/NULL VALUES for Database (PostgreSQL)
+-- Mock Data with MISSING/NULL VALUES for Database (Microsoft SQL Server)
 -- Useful for testing missing data pipelines or error handling
 -- =======================================================
 
+SET IDENTITY_INSERT tbCaseData ON;
+
 -- 1. Insert Mock Data into tbCaseData
 INSERT INTO tbCaseData (
-    coE2I222, coPatientId, coE2I223, coE2I228, coLastname, coFirstname,
+    coId, coE2I222, coPatientId, coE2I223, coE2I228, coLastname, coFirstname,
     coGender, coDateOfBirth, coAgeYears, coTypeOfStay, coIcd, coDrgName,
     coRecliningType, coState
 ) VALUES
-(1004, 5004, '2026-02-13 08:00:00', NULL, 'Williams', 'Sarah', NULL, '1985-05-15 00:00:00', NULL, 'Inpatient', 'I10', NULL, 'Standard', 'Admitted'),
-(1005, NULL, '2026-02-14 09:30:00', NULL, 'Brown', NULL, 'F', NULL, 33, 'Outpatient', NULL, 'Type 2 Diabetes', 'Standard', 'Admitted'),
-(NULL, 5006, NULL, '2026-02-15 10:00:00', NULL, 'David', 'M', '1975-03-08 00:00:00', 50, NULL, 'J45.9', 'Asthma', NULL, 'Discharged');
+(4, 1004, 5004, '2026-02-13 08:00:00', NULL, 'Williams', 'Sarah', NULL, '1985-05-15 00:00:00', NULL, 'Inpatient', 'I10', NULL, 'Standard', 'Admitted'),
+(5, 1005, NULL, '2026-02-14 09:30:00', NULL, 'Brown', NULL, 'F', NULL, 33, 'Outpatient', NULL, 'Type 2 Diabetes', 'Standard', 'Admitted'),
+(6, NULL, 5006, NULL, '2026-02-15 10:00:00', NULL, 'David', 'M', '1975-03-08 00:00:00', 50, NULL, 'J45.9', 'Asthma', NULL, 'Discharged');
+
+SET IDENTITY_INSERT tbCaseData OFF;
+
+-- =======================================================
 
 -- 2. Insert Mock Data into tbImportAcData
 INSERT INTO tbImportAcData (
     coCaseId, coE0I001, coE0I005, coE0I0004, coE2I225, coE2I230
 ) VALUES
 (4, NULL, 98.600, NULL, '2026-02-13 08:30:00', 'General Ward'),
-(5, 20, NULL, 'Blood Sugar Monitoring', NULL, 'Outpatient Clinic'),
+(5, 20, NULL, 'Blood Sugar Monitoring', '2026-02-14 10:00:00', 'Outpatient Clinic'),
 (NULL, 30, 101.200, 'Severe Asthma Attack', '2026-02-10 14:45:00', NULL);
 
 -- 3. Insert Mock Data into tbImportLabsData

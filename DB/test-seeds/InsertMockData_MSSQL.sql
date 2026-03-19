@@ -1,16 +1,24 @@
 -- =======================================================
--- Mock Data for Hack2026 Database (PostgreSQL)
+-- Mock Data for Hack2026 Database (Microsoft SQL Server)
 -- =======================================================
+
+-- IMPORTANT: In MS SQL Server, to manually insert into an IDENTITY column,
+-- you must turn on IDENTITY_INSERT.
+SET IDENTITY_INSERT tbCaseData ON;
 
 -- 1. Insert Mock Data into tbCaseData
 INSERT INTO tbCaseData (
-    coE2I222, coPatientId, coE2I223, coE2I228, coLastname, coFirstname,
+    coId, coE2I222, coPatientId, coE2I223, coE2I228, coLastname, coFirstname,
     coGender, coDateOfBirth, coAgeYears, coTypeOfStay, coIcd, coDrgName,
     coRecliningType, coState
 ) VALUES
-(1001, 5001, '2026-02-13 08:00:00', '2026-02-18 12:00:00', 'Smith', 'John', 'M', '1980-05-15 00:00:00', 45, 'Inpatient', 'I10', 'Heart Failure', 'Standard', 'Discharged'),
-(1002, 5002, '2026-02-14 09:30:00', NULL, 'Doe', 'Jane', 'F', '1992-11-20 00:00:00', 33, 'Outpatient', 'E11.9', 'Type 2 Diabetes', 'Standard', 'Admitted'),
-(1003, 5003, '2026-02-10 14:15:00', '2026-02-15 10:00:00', 'Miller', 'David', 'M', '1975-03-08 00:00:00', 50, 'Inpatient', 'J45.9', 'Asthma', 'Intensive Care', 'Discharged');
+(1, 1001, 5001, '2026-02-13 08:00:00', '2026-02-18 12:00:00', 'Smith', 'John', 'M', '1980-05-15 00:00:00', 45, 'Inpatient', 'I10', 'Heart Failure', 'Standard', 'Discharged'),
+(2, 1002, 5002, '2026-02-14 09:30:00', NULL, 'Doe', 'Jane', 'F', '1992-11-20 00:00:00', 33, 'Outpatient', 'E11.9', 'Type 2 Diabetes', 'Standard', 'Admitted'),
+(3, 1003, 5003, '2026-02-10 14:15:00', '2026-02-15 10:00:00', 'Miller', 'David', 'M', '1975-03-08 00:00:00', 50, 'Inpatient', 'J45.9', 'Asthma', 'Intensive Care', 'Discharged');
+
+SET IDENTITY_INSERT tbCaseData OFF;
+
+-- =======================================================
 
 -- 2. Insert Mock Data into tbImportAcData
 INSERT INTO tbImportAcData (

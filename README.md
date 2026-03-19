@@ -2,7 +2,7 @@
 
 ## 🚀 Getting Started
 
-This repository contains the architecture and tools for ingesting, standardizing, and mapping clinical data across multiple formats (CSV, PDF, Markdown) into a unified PostgreSQL schema.
+This repository contains the architecture and tools for ingesting, standardizing, and mapping clinical data across multiple formats (CSV, PDF, Markdown) into a unified MS SQL Server schema.
 
 ---
 
@@ -16,7 +16,7 @@ bash start_everything.sh
 ```
 
 **What this does:**
-1. Spins up a PostgreSQL database and injects the schema.
+1. Spins up a Microsoft SQL Server database and injects the schema.
 2. Injects test data (with purposely missing values) to demonstrate the Missing Data Tool.
 3. Starts the Python FastAPI Backend.
 4. Starts the React Interactive Dashboard.
@@ -27,22 +27,22 @@ Once it completes, simply navigate to 👉 **http://localhost:3000** to use the 
 
 ---
 
-### 1. Database Details (PostgreSQL via Docker)
+### 1. Database Details (MS SQL Server via Docker)
 
-The challenge originally provided a Microsoft SQL Server database schema. We have ported this exactly to **PostgreSQL**.
+We use the original Microsoft SQL Server schema provided in the challenge.
 
 If you wish to spin up *only* the database manually:
 ```sh
-bash DB/setup_postgres_docker.sh
+bash DB/setup_mssql_docker.sh
 bash DB/test-seeds/insert_mock_data_missing.sh
 ```
 
 **Connection Details:**
 - **Host:** localhost
-- **Port:** 5432
+- **Port:** 1433
 - **Database:** CaseDB
-- **Username:** postgres
-- **Password:** postgres
+- **Username:** SA
+- **Password:** StartHack2026!
 
 ---
 

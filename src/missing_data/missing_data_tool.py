@@ -31,13 +31,17 @@ class MissingDataTool:
             # Since we don't know the columns ahead of time, we dynamically generate the condition
             # by fetching the column names for the table first.
             
-            # Get all column names for the current table
+            # Get all column names for the current table (MS SQL Server syntax)
             col_query = """
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = LOWER(%s);
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_NAME = ?;
             """
-            columns = [row['column_name'] for row in self.db.fetch_all(col_query, (table,))]
+            try:
+                columns = [row['column_name'] for row in self.db.fetch_all(col_query, (table,))]
+            except Exception as e:
+                print(f"[Error] Failed to fetch columns for {table}: {e}")
+                continue
             
             if not columns:
                 continue
@@ -82,7 +86,7 @@ class MissingDataTool:
             
         # Hardcoding the primary key 'coid' as it is standard across all tables
         # Also, using standard parameterization for the value, but we have to inject the column name
-        query = f"UPDATE {valid_table} SET {column_name} = %s WHERE coid = %s;"
+        query = f"UPDATE {valid_table} SET {column_name} = ? WHERE coid = ?;"
         
         try:
             rows_affected = self.db.execute_update(query, (new_value, row_id))
@@ -101,12 +105,13 @@ class MissingDataTool:
         Phase 2 Feature: Helper method to search the tbCaseData table to find the correct ID
         based on a patient's name, ID, or condition to assist the human operator.
         """
+        # Note: MS SQL uses LIKE instead of ILIKE for case-insensitive matches usually
         query = """
             SELECT coid, copatientid, colastname, cofirstname, coicd, codrgname 
             FROM tbCaseData 
-            WHERE CAST(copatientid AS VARCHAR) ILIKE %s 
-               OR colastname ILIKE %s 
-               OR cofirstname ILIKE %s;
+            WHERE CAST(copatientid AS VARCHAR) LIKE ? 
+               OR colastname LIKE ? 
+               OR cofirstname LIKE ?;
         """
         search_pattern = f"%{search_term}%"
         return self.db.fetch_all(query, (search_pattern, search_pattern, search_pattern))
