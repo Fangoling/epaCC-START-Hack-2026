@@ -1,4 +1,6 @@
 import os
+import sys
+import argparse
 import pymupdf4llm
 import fitz  # Standard PyMuPDF
 
@@ -52,28 +54,38 @@ class PyMuPDFParser:
             print(f"Error parsing PDF with base fitz: {e}")
             raise
 
-# ==========================================
-# Example Usage (How the pipeline calls it)
-# ==========================================
-if __name__ == "__main__":
+def main():
+    # Set up command-line argument parsing
+    arg_parser = argparse.ArgumentParser(description="Parse a PDF file to Markdown using PyMuPDF4LLM.")
+    arg_parser.add_argument("pdf_path", type=str, help="Path to the PDF file you want to parse.")
+    arg_parser.add_argument("-o", "--output", type=str, help="Optional output file path to save the Markdown. If not provided, prints to console.", default=None)
+    
+    args = arg_parser.parse_args()
+    
+    pdf_path = args.pdf_path
+    
+    if not os.path.exists(pdf_path):
+        print(f"Error: The file '{pdf_path}' does not exist.")
+        sys.exit(1)
+
     parser = PyMuPDFParser()
-    sample_pdf_path = "sample_document.pdf" 
     
-    # Create a dummy PDF for testing if it doesn't exist
-    if not os.path.exists(sample_pdf_path):
-        doc = fitz.open()
-        page = doc.new_page()
-        page.insert_text((50, 50), "Sample PDF Document\n\nThis is a test.")
-        doc.save(sample_pdf_path)
-    
-    # Execute the parsing
+    print(f"Parsing PDF: {pdf_path}...\n")
     try:
-        markdown_output = parser.parse_to_markdown(sample_pdf_path)
-        print("--- Extracted Markdown ---")
-        print(markdown_output)
+        markdown_output = parser.parse_to_markdown(pdf_path)
         
-        # In your architecture, this 'markdown_output' string is what you 
-        # will pass directly to the 'Unstructured Data Parser'.
-        
+        if args.output:
+            # Write to the specified output file
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(markdown_output)
+            print(f"Success! Markdown saved to {args.output}")
+        else:
+            # Print to console
+            print("--- Extracted Markdown ---")
+            print(markdown_output)
+            
     except Exception as e:
         print("Pipeline failed:", e)
+
+if __name__ == "__main__":
+    main()
