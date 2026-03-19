@@ -51,13 +51,17 @@ def _get_client():
 
 def _guard() -> bool:
     """Return False (with a log message) if Ollama is disabled, key missing, or libs absent."""
+    print(f"[ollama] _guard: LLM_AVAILABLE={_LLM_AVAILABLE} ENABLED={OLLAMA_ENABLED} KEY_SET={bool(OLLAMA_API_KEY)}")
     if not _LLM_AVAILABLE:
+        print("[ollama] _guard: instructor/openai not installed — falling back.")
         return False
     if not OLLAMA_ENABLED:
+        print("[ollama] _guard: OLLAMA_ENABLED=false — falling back.")
         return False
     if not OLLAMA_API_KEY:
-        print("[ai_mapping] OLLAMA_API_KEY not set — falling back.")
+        print("[ollama] _guard: OLLAMA_API_KEY not set — falling back.")
         return False
+    print(f"[ollama] _guard: OK — url={OLLAMA_URL} model={OLLAMA_MODEL} timeout={OLLAMA_TIMEOUT}s")
     return True
 
 
@@ -85,6 +89,7 @@ def call_structured(
     Returns:
         Validated Pydantic instance, or None if unavailable/failed.
     """
+    print(f"[ollama] call_structured: model={model or OLLAMA_MODEL} response_model={response_model.__name__}")
     if not _guard():
         return None
 
@@ -94,30 +99,33 @@ def call_structured(
     messages.append({"role": "user", "content": prompt})
 
     target_model = model or OLLAMA_MODEL
+    print(f"[ollama] call_structured: sending request to {OLLAMA_URL}/v1 prompt_len={len(prompt)}")
 
     for attempt in range(_BACKOFF_RETRIES):
         try:
+            print(f"[ollama] call_structured: attempt {attempt + 1}/{_BACKOFF_RETRIES}")
             client = _get_client()
-            return client.chat.completions.create(
+            result = client.chat.completions.create(
                 model=target_model,
                 response_model=response_model,
                 messages=messages,
                 max_retries=_MAX_RETRIES,
             )
+            print(f"[ollama] call_structured: success — got {response_model.__name__}")
+            return result
         except APIConnectionError as exc:
             wait = _BACKOFF_BASE ** attempt
-            print(f"[ai_mapping] Connection error (attempt {attempt + 1}/{_BACKOFF_RETRIES}): "
-                  f"{exc} — retrying in {wait:.0f}s")
+            print(f"[ollama] call_structured: connection error (attempt {attempt + 1}/{_BACKOFF_RETRIES}): {exc} — retrying in {wait:.0f}s")
             if attempt < _BACKOFF_RETRIES - 1:
                 time.sleep(wait)
         except APIStatusError as exc:
-            print(f"[ai_mapping] API error {exc.status_code}: {exc.message} — falling back.")
+            print(f"[ollama] call_structured: API error {exc.status_code}: {exc.message} — falling back.")
             return None
         except Exception as exc:
-            print(f"[ai_mapping] Unexpected error: {exc} — falling back.")
+            print(f"[ollama] call_structured: unexpected error ({type(exc).__name__}): {exc} — falling back.")
             return None
 
-    print("[ai_mapping] All retries exhausted — falling back.")
+    print("[ollama] call_structured: all retries exhausted — falling back.")
     return None
 
 
@@ -131,14 +139,16 @@ def call_ollama(prompt: str, model: str | None = None) -> str | None:
     Used for transformation script generation where output is Python code.
     Includes exponential backoff.
     """
+    print(f"[ollama] call_ollama: model={model or OLLAMA_MODEL}")
     if not _guard():
         return None
 
     target_model = model or OLLAMA_MODEL
+    print(f"[ollama] call_ollama: sending raw request to {OLLAMA_URL}/v1 prompt_len={len(prompt)}")
 
     for attempt in range(_BACKOFF_RETRIES):
         try:
-            # Use plain OpenAI client (no instructor) for raw text
+            print(f"[ollama] call_ollama: attempt {attempt + 1}/{_BACKOFF_RETRIES}")
             base = _OpenAI(
                 base_url=f"{OLLAMA_URL.rstrip('/')}/v1",
                 api_key=OLLAMA_API_KEY or "ollama",
@@ -148,15 +158,17 @@ def call_ollama(prompt: str, model: str | None = None) -> str | None:
                 model=target_model,
                 messages=[{"role": "user", "content": prompt}],
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            print(f"[ollama] call_ollama: success — response_len={len(content or '')}")
+            return content
         except APIConnectionError as exc:
             wait = _BACKOFF_BASE ** attempt
-            print(f"[ai_mapping] Connection error (attempt {attempt + 1}/{_BACKOFF_RETRIES}): "
-                  f"{exc} — retrying in {wait:.0f}s")
+            print(f"[ollama] call_ollama: connection error (attempt {attempt + 1}/{_BACKOFF_RETRIES}): {exc} — retrying in {wait:.0f}s")
             if attempt < _BACKOFF_RETRIES - 1:
                 time.sleep(wait)
         except Exception as exc:
-            print(f"[ai_mapping] Ollama error: {exc} — falling back.")
+            print(f"[ollama] call_ollama: unexpected error ({type(exc).__name__}): {exc} — falling back.")
             return None
 
+    print("[ollama] call_ollama: all retries exhausted — falling back.")
     return None

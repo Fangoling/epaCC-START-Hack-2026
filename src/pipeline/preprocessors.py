@@ -177,6 +177,7 @@ def pivot_sid_rows(
         columns=sid_col,
         values=value_col,
         aggfunc="first",
+        dropna=False,
     ).reset_index()
     pivoted.columns.name = None
     return pivoted

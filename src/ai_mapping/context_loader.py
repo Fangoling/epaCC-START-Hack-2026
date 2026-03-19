@@ -33,6 +33,26 @@ SAMPLE_ROWS = 5  # how many source rows to include in the prompt
 # 1. IID / SID Mapping
 # ---------------------------------------------------------------------------
 
+def build_sid_to_ddl_column() -> dict[str, str]:
+    """
+    Build a lookup dict mapping SID codes (e.g. '08_02') to their DDL column
+    names (e.g. 'coE2I042') by reading IID-SID-ITEM.csv.
+
+    Conversion: IID 'E2_I_042' → strip underscores → 'E2I042' → add 'co' → 'coE2I042'.
+    Only the first IID encountered for each SID is kept.
+    """
+    mapping: dict[str, str] = {}
+    with open(IID_SID_PATH, encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f, delimiter=";")
+        for row in reader:
+            sid = row["ItmSID"].strip()
+            iid = row["ItmIID"].strip()
+            if sid and iid and sid not in mapping:
+                ddl_col = "co" + iid.replace("_", "")
+                mapping[sid] = ddl_col
+    return mapping
+
+
 def load_iid_sid_mapping(max_rows: int = 200) -> str:
     """
     Return a compact text table of IID → SID → German name → English name.
@@ -114,13 +134,26 @@ def load_target_schema(table_name: str) -> str:
     """
     Extract the CREATE TABLE block for `table_name` from the SQL DDL file
     and return it as a plain text string.
+
+    Uses depth-tracking parenthesis matching so that type expressions like
+    nvarchar(256) do not prematurely end the match.
     """
     sql = SQL_PATH.read_text(encoding="utf-8", errors="replace")
-    # Match the CREATE TABLE block (non-greedy, ends at closing paren + optional go/;)
-    pattern = rf"create\s+table\s+{re.escape(table_name)}\s*\(.*?\)"
-    match = re.search(pattern, sql, re.IGNORECASE | re.DOTALL)
-    if match:
-        return match.group().strip()
+    # Find the opening of the CREATE TABLE block
+    pattern = rf"create\s+table\s+{re.escape(table_name)}\s*\("
+    match = re.search(pattern, sql, re.IGNORECASE)
+    if not match:
+        return f"(table {table_name!r} not found in DDL)"
+    start = match.start()
+    # Walk from the opening '(' tracking depth to find the matching close paren
+    depth = 0
+    for i in range(match.end() - 1, len(sql)):
+        if sql[i] == "(":
+            depth += 1
+        elif sql[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return sql[start : i + 1].strip()
     return f"(table {table_name!r} not found in DDL)"
 
 
