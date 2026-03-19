@@ -8,6 +8,14 @@ import DataQualityDashboard from "@/components/DataQualityDashboard";
 import { getPatientSummaries, fieldLabels, type PatientSummary, type DataError } from "@/data/mockData";
 import { fetchPatients, fetchMissingData, type BrokenEntry } from "@/lib/api";
 
+// Case-insensitive field label lookup (API returns lowercase column names)
+const fieldLabelsLower = Object.fromEntries(
+  Object.entries(fieldLabels).map(([k, v]) => [k.toLowerCase(), v])
+);
+function getFieldLabel(col: string): string {
+  return fieldLabels[col] || fieldLabelsLower[col.toLowerCase()] || col;
+}
+
 function transformBrokenEntriesToErrors(entries: BrokenEntry[]): DataError[] {
   return entries.map((entry) => {
     const firstCol = entry.missing_columns[0] || "";
@@ -16,10 +24,10 @@ function transformBrokenEntriesToErrors(entries: BrokenEntry[]): DataError[] {
       id: entry.id,
       sourceInstitution: "Unbekannt",
       patientId,
-      dataField: fieldLabels[firstCol] || firstCol,
+      dataField: getFieldLabel(firstCol),
       tableName: entry.table,
       columnName: firstCol,
-      errorDescription: `${fieldLabels[firstCol] || firstCol} fehlt`,
+      errorDescription: `${getFieldLabel(firstCol)} fehlt`,
       errorType: "missing" as const,
       priority: "medium" as const,
       status: "new" as const,
