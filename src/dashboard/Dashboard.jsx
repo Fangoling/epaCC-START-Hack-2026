@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import mockData from './mockData.json';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -15,12 +14,32 @@ const Dashboard = () => {
   // UI States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // 1. Fetch initial data (Using mock data for the prototype)
+  // Define the base URL for our Python API
+  const API_BASE_URL = 'http://localhost:8000';
+
+  // 1. Fetch initial data from the Python API
   useEffect(() => {
-    // In a real app, this would be: fetch('/api/missing-data').then(...)
-    setTotalCases(mockData.totalCases);
-    setBrokenEntries(mockData.brokenEntries);
+    const fetchMissingData = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/missing-data`);
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        setTotalCases(data.totalCases);
+        setBrokenEntries(data.brokenEntries);
+      } catch (err) {
+        console.error("Failed to fetch data:", err);
+        setError("Failed to connect to the backend API. Make sure the Python server is running on port 8000.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMissingData();
   }, []);
 
   // Handler: Selecting a row to fix
@@ -32,7 +51,7 @@ const Dashboard = () => {
     setNotification(null);
   };
 
-  // Handler: Submitting the fix (The Feedback Loop)
+  // Handler: Submitting the fix (The Feedback Loop to the Database)
   const handleSubmitFix = async (e) => {
     e.preventDefault();
     if (!selectedEntry || !selectedColumn || !correctionValue) return;
@@ -47,14 +66,23 @@ const Dashboard = () => {
     };
 
     try {
-      // Simulate API Call delay
-      // In production: await fetch('/api/missing-data/fix', { method: 'POST', body: JSON.stringify(payload) })
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      // Send the POST request to the Python API
+      const response = await fetch(`${API_BASE_URL}/api/missing-data/fix`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
 
-      console.log('Sending correction to Python Backend:', payload);
+      if (!response.ok) {
+        throw new Error('Failed to update the database.');
+      }
+
+      console.log('Successfully sent correction to Python Backend:', payload);
 
       // --- SUCCESS STATE LOGIC ---
-      // 1. Update the local state to remove the fixed missing column
+      // Update the local state to remove the fixed missing column
       setBrokenEntries((prevEntries) => {
         return prevEntries.map(entry => {
           if (entry.id === selectedEntry.id) {
@@ -78,12 +106,21 @@ const Dashboard = () => {
       setSelectedEntry(null);
       setCorrectionValue('');
 
-    } catch (error) {
-      setNotification({ type: 'error', message: 'Failed to save correction. Please try again.' });
+    } catch (err) {
+      console.error(err);
+      setNotification({ type: 'error', message: 'Failed to save correction to the database. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return <div className="empty-state">Loading data from Database...</div>;
+  }
+
+  if (error) {
+    return <div className="empty-state error-text">⚠️ {error}</div>;
+  }
 
   return (
     <div className="dashboard-container">
@@ -196,7 +233,7 @@ const Dashboard = () => {
               <div className="form-actions">
                 <button type="button" className="btn-cancel" onClick={() => setSelectedEntry(null)}>Cancel</button>
                 <button type="submit" className="btn-save" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Save & Map Data'}
+                  {isSubmitting ? 'Saving to DB...' : 'Save & Map Data'}
                 </button>
               </div>
             </form>

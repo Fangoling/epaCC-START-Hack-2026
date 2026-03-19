@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-CONTAINER_NAME="epaCC-START-Hack-2026"
+CONTAINER_NAME="case-db"
 DB_NAME="CaseDB"
 DB_USER="postgres"
 DB_PASS="postgres"

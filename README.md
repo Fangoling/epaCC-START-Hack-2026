@@ -6,26 +6,38 @@ This repository contains the architecture and tools for ingesting, standardizing
 
 ---
 
-### 1. Database Setup (PostgreSQL via Docker)
+### 🌟 Quick Start: The Magic Button
+To make testing and judging as easy as possible, we have fully containerized the entire application stack via Docker.
+
+You can spin up the Database, the Backend API, and the Frontend Interactive Dashboard all at once by running a single script:
+
+```sh
+bash start_everything.sh
+```
+
+**What this does:**
+1. Spins up a PostgreSQL database and injects the schema.
+2. Injects test data (with purposely missing values) to demonstrate the Missing Data Tool.
+3. Starts the Python FastAPI Backend.
+4. Starts the React Interactive Dashboard.
+
+Once it completes, simply navigate to 👉 **http://localhost:3000** to use the tool!
+
+*(To cleanly shut down the entire stack later, just run `bash stop_everything.sh`)*
+
+---
+
+### 1. Database Details (PostgreSQL via Docker)
 
 The challenge originally provided a Microsoft SQL Server database schema. We have ported this exactly to **PostgreSQL**.
 
-We have provided an automated script that will download PostgreSQL via Docker, spin up the container, create the `CaseDB` database, and build the entire schema automatically.
-
-**Prerequisites:** Ensure you have [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running on your machine.
-
-**Run the setup script:**
+If you wish to spin up *only* the database manually:
 ```sh
 bash DB/setup_postgres_docker.sh
-```
-
-*(Optional)* To inject mock test data with broken/missing values into the database to test the dashboard, run:
-```sh
-bash DB/insert_mock_data_missing.sh
+bash DB/test-seeds/insert_mock_data_missing.sh
 ```
 
 **Connection Details:**
-Once the script completes, your database will be live at:
 - **Host:** localhost
 - **Port:** 5432
 - **Database:** CaseDB
@@ -38,17 +50,10 @@ Once the script completes, your database will be live at:
 
 We have built a "Missing Data Tool" Dashboard to interactively visualize and manually remediate orphaned records or missing data from the `CaseDB`. 
 
-This entire UI layer runs fully containerized via Docker.
-
-**Run the Dashboard:**
+If you wish to run *only* the UI manually:
 ```sh
 bash src/dashboard/run_dashboard_docker.sh
 ```
-
-Once it builds and starts, simply open your web browser and navigate to:
-👉 **http://localhost:3000**
-
-*(To stop the dashboard later, run: `docker stop dashboard-ui`)*
 
 ---
 

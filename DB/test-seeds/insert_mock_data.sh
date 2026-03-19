@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Configuration
-CONTAINER_NAME="epaCC-START-Hack-2026"
+CONTAINER_NAME="case-db"
 DB_NAME="CaseDB"
 DB_USER="postgres"
-MOCK_DATA_FILE="DB/InsertMockData_Postgres.sql"
+MOCK_DATA_FILE="DB/test-seeds/InsertMockData_Postgres.sql"
 
 echo "================================================="
 echo "   Injecting Mock Data into PostgreSQL Database  "
