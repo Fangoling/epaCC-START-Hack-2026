@@ -22,16 +22,16 @@ if [ "$(docker ps -aq -f name=missing-data-api-container)" ]; then
     docker rm missing-data-api-container > /dev/null
 fi
 
-# Stop and remove the Postgres Database container
+# Stop and remove the Database container
 if [ "$(docker ps -aq -f name=case-db)" ]; then
-    echo "[INFO] Stopping PostgreSQL Database ..."
+    echo "[INFO] Stopping MS SQL Server Database (case-db)..."
     docker stop case-db > /dev/null
     docker rm case-db > /dev/null
 fi
 
 # Also check for the old name just in case
 if [ "$(docker ps -aq -f name=hack2026-db)" ]; then
-    echo "[INFO] Stopping old PostgreSQL Database (hack2026-db)..."
+    echo "[INFO] Stopping old Database (hack2026-db)..."
     docker stop hack2026-db > /dev/null
     docker rm hack2026-db > /dev/null
 fi

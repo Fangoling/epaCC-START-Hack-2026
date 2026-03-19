@@ -11,9 +11,9 @@ set -e
 echo "🚀 Starting the epaCC Data Ingestion Stack..."
 echo "-----------------------------------------------------------------"
 
-# Step 1: Start the PostgreSQL Database
-echo "📦 [Step 1/4] Setting up the PostgreSQL Database..."
-bash DB/setup_postgres_docker.sh
+# Step 1: Start the MS SQL Server Database
+echo "📦 [Step 1/4] Setting up the MS SQL Server Database..."
+bash DB/setup_mssql_docker.sh
 
 # Step 2: Inject Mock Data (with missing values to demonstrate the tool)
 echo "🧬 [Step 2/4] Injecting test data with missing values..."
@@ -39,7 +39,7 @@ echo "-----------------------------------------------------------------"
 echo ""
 echo "👉 The Interactive Dashboard is available at: http://localhost:3000"
 echo "👉 The Backend API is available at:           http://localhost:8000/docs"
-echo "👉 The PostgreSQL Database is available at:   localhost:5432 (User: postgres)"
+echo "👉 The MS SQL Server DB is available at:      localhost:1433 (User: SA)"
 echo ""
 echo "To shut everything down, run: bash stop_everything.sh"
 echo "================================================================="

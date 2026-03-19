@@ -75,8 +75,10 @@ def get_missing_data():
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"API Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch missing data from the database.")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch missing data from the database. Error: {e}")
 
 
 @app.post("/api/missing-data/fix")
