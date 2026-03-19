@@ -61,7 +61,7 @@ class DataIngestionPipeline:
 class AIMappingAgent:
     """
     The external component receiving the consolidated "Data" streams 
-    from the Data Ingestion Layer.
+    from the data_ingestion.
     """
     def __init__(self):
         pass
