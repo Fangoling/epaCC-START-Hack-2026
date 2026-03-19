@@ -22,6 +22,7 @@ elif [ "$(docker ps -aq -f status=exited -f name=$CONTAINER_NAME)" ]; then
 else
     echo "[INFO] Starting a fresh MS SQL Server container..."
     docker run --name $CONTAINER_NAME \
+        -u root \
         -e "ACCEPT_EULA=Y" \
         -e "MSSQL_SA_PASSWORD=$DB_PASS" \
         -p $DB_PORT:1433 \
