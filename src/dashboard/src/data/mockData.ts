@@ -574,6 +574,9 @@ export interface DataError {
   correctedBy?: string;
   correctedAt?: string;
   comment?: string;
+  // Fields populated when data comes from the real API
+  rowId?: number;
+  allMissingColumns?: string[];
 }
 
 export const dataErrors: DataError[] = [

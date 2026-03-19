@@ -57,6 +57,20 @@ class DBHandler:
                     results.append(dict(zip(columns, row)))
                 return results
 
+    def fetch_all_preserve_case(self, query, params=None):
+        """Executes a SELECT query and returns all rows as dictionaries with original column name casing."""
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                if params:
+                    cur.execute(query, params)
+                else:
+                    cur.execute(query)
+                columns = [column[0] for column in cur.description]  # preserve original case
+                results = []
+                for row in cur.fetchall():
+                    results.append(dict(zip(columns, row)))
+                return results
+
     def execute_update(self, query, params=None):
         """Executes an UPDATE/INSERT/DELETE query."""
         with self.get_connection() as conn:
