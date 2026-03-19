@@ -6,7 +6,7 @@ import fitz  # Standard PyMuPDF
 
 class PyMuPDFParser:
     """
-    Implementation of the 'PDF Parser (PyMuPDF)' component from the Data Ingestion Layer.
+    Implementation of the 'PDF Parser (PyMuPDF)' component from the data_ingestion.
     Ingests a PDF file and outputs structured Markdown.
     """
     

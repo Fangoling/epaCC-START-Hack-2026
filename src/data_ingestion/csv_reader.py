@@ -4,7 +4,7 @@ import json
 
 class CSVReader:
     """
-    Implementation of the 'CSV Reader' component from the Data Ingestion Layer.
+    Implementation of the 'CSV Reader' component from the data_ingestion.
     Ingests a CSV file and outputs structured data (e.g., JSON or dictionaries) 
     that can be processed by downstream components.
     """
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     reader = CSVReader()
     
     # We can use the CSV file already present in your project
-    sample_csv_path = "../IID-SID-ITEM.csv"
+    sample_csv_path = "../../IID-SID-ITEM.csv"
     
     if os.path.exists(sample_csv_path):
         try:
