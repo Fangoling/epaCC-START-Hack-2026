@@ -134,6 +134,17 @@ def list_target_tables() -> list[str]:
 # 4. Source Sample
 # ---------------------------------------------------------------------------
 
+def load_source_sample_from_df(df: "pd.DataFrame", n: int = SAMPLE_ROWS) -> tuple[str, str]:
+    """
+    Build (headers_str, sample_str) from an already-loaded DataFrame.
+    Used by the pipeline router when the DataFrame has already been preprocessed.
+    """
+    df = df.head(n)
+    headers_str = ", ".join(str(c) for c in df.columns)
+    sample_str = df.to_string(index=False, max_cols=30)
+    return headers_str, sample_str
+
+
 def load_source_sample(source_path: str | Path, n: int = SAMPLE_ROWS) -> tuple[str, str]:
     """
     Read the first `n` data rows from a CSV or XLSX file.
