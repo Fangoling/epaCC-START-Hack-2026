@@ -229,16 +229,17 @@ def get_cases_for_patient(patient_id: int):
 @app.get("/api/quality-metrics")
 def get_quality_metrics():
     """
-    Returns data quality metrics per table: total records and records with any NULL column.
+    Returns data quality metrics per table using cell-level completeness
+    (% of individual field values that are non-NULL, not rows-with-any-null).
     """
     try:
         all_tables = tool.target_tables  # includes tbCaseData
         by_table: dict[str, dict] = {}
-        total_all = 0
-        missing_all = 0
+        total_cells_all = 0
+        null_cells_all = 0
 
         for table in all_tables:
-            # Get column names
+            # Get column names (values preserve original casing from INFORMATION_SCHEMA)
             try:
                 col_rows = tool.db.fetch_all(
                     "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?",
@@ -257,7 +258,31 @@ def get_quality_metrics():
             except Exception:
                 total_rows = 0
 
-            # Rows with any NULL
+            if total_rows == 0:
+                frontend_key = TABLE_TO_KEY.get(table, table)
+                by_table[frontend_key] = {
+                    "tableName": table, "total": 0, "missing": 0,
+                    "completeness": 100, "missingPct": 0,
+                }
+                continue
+
+            # Count NULL cells per column using a single query with SUM(CASE WHEN ...)
+            try:
+                null_sums = " + ".join(
+                    [f"SUM(CASE WHEN {col} IS NULL THEN 1 ELSE 0 END)" for col in columns]
+                )
+                null_result = tool.db.fetch_all(
+                    f"SELECT {null_sums} AS total_nulls FROM {table}"
+                )[0]
+                total_null_cells = list(null_result.values())[0] or 0
+            except Exception:
+                total_null_cells = 0
+
+            total_cells = total_rows * len(columns)
+            completeness = round((1 - total_null_cells / total_cells) * 100) if total_cells > 0 else 100
+            missing_pct = round((total_null_cells / total_cells) * 100) if total_cells > 0 else 0
+
+            # Rows with any NULL (kept for informational count)
             try:
                 where = " OR ".join([f"{col} IS NULL" for col in columns])
                 missing_rows = tool.db.fetch_all(
@@ -266,26 +291,27 @@ def get_quality_metrics():
             except Exception:
                 missing_rows = 0
 
-            completeness = round((1 - missing_rows / total_rows) * 100) if total_rows > 0 else 100
             frontend_key = TABLE_TO_KEY.get(table, table)
-
             by_table[frontend_key] = {
                 "tableName": table,
                 "total": total_rows,
                 "missing": missing_rows,
                 "completeness": completeness,
-                "missingPct": round((missing_rows / total_rows) * 100) if total_rows > 0 else 0,
+                "missingPct": missing_pct,
             }
 
-            total_all += total_rows
-            missing_all += missing_rows
+            total_cells_all += total_cells
+            null_cells_all += total_null_cells
 
-        overall_completeness = round((1 - missing_all / total_all) * 100) if total_all > 0 else 100
+        overall_completeness = round((1 - null_cells_all / total_cells_all) * 100) if total_cells_all > 0 else 100
+
+        # Sum total rows across all tables for display
+        total_rows_all = sum(v["total"] for v in by_table.values())
 
         return {
             "overallCompleteness": overall_completeness,
-            "totalRecords": total_all,
-            "missingRecords": missing_all,
+            "totalRecords": total_rows_all,
+            "missingRecords": sum(v["missing"] for v in by_table.values()),
             "byTable": by_table,
         }
 

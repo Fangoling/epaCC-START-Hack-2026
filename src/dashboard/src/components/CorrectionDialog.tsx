@@ -1,9 +1,17 @@
 import { useState } from "react";
-import { X, CheckCircle2, Lightbulb } from "lucide-react";
+import { X, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type DataError, fieldLabels } from "@/data/mockData";
+
+// Case-insensitive lookup for column names coming from the API (which lowercases them)
+const fieldLabelsLower = Object.fromEntries(
+  Object.entries(fieldLabels).map(([k, v]) => [k.toLowerCase(), v])
+);
+function getFieldLabel(col: string): string {
+  return fieldLabels[col] || fieldLabelsLower[col.toLowerCase()] || col;
+}
 
 interface Props {
   error: DataError;
@@ -56,7 +64,7 @@ const CorrectionDialog = ({ error, onClose, onCorrect }: Props) => {
               <SelectContent>
                 {allColumns.map((col) => (
                   <SelectItem key={col} value={col}>
-                    {fieldLabels[col] || col}
+                    {getFieldLabel(col)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -68,7 +76,7 @@ const CorrectionDialog = ({ error, onClose, onCorrect }: Props) => {
         {allColumns.length === 1 && (
           <div className="mt-4">
             <p className="text-sm font-medium">
-              Fehlendes Feld: <span className="text-primary font-semibold">{fieldLabels[selectedColumn] || selectedColumn}</span>
+              Fehlendes Feld: <span className="text-primary font-semibold">{getFieldLabel(selectedColumn)}</span>
             </p>
           </div>
         )}
@@ -80,7 +88,7 @@ const CorrectionDialog = ({ error, onClose, onCorrect }: Props) => {
             className="mt-1.5"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={`Wert für ${fieldLabels[selectedColumn] || selectedColumn} eingeben...`}
+            placeholder={`Wert für ${getFieldLabel(selectedColumn)} eingeben...`}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && value) onCorrect(error.id, value, '', 'save');
             }}
