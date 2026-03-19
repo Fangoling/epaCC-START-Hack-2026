@@ -19,6 +19,11 @@ We have provided an automated script that will download PostgreSQL via Docker, s
 bash DB/setup_postgres_docker.sh
 ```
 
+*(Optional)* To inject mock test data with broken/missing values into the database to test the dashboard, run:
+```sh
+bash DB/insert_mock_data_missing.sh
+```
+
 **Connection Details:**
 Once the script completes, your database will be live at:
 - **Host:** localhost
@@ -29,7 +34,25 @@ Once the script completes, your database will be live at:
 
 ---
 
-### 2. Data Ingestion Pipeline
+### 2. Interactive Dashboard (React via Docker)
+
+We have built a "Missing Data Tool" Dashboard to interactively visualize and manually remediate orphaned records or missing data from the `CaseDB`. 
+
+This entire UI layer runs fully containerized via Docker.
+
+**Run the Dashboard:**
+```sh
+bash src/dashboard/run_dashboard_docker.sh
+```
+
+Once it builds and starts, simply open your web browser and navigate to:
+👉 **http://localhost:3000**
+
+*(To stop the dashboard later, run: `docker stop dashboard-ui`)*
+
+---
+
+### 3. Data Ingestion Pipeline
 
 The Data Ingestion Layer intelligently processes incoming files, structures them, and outputs unified "Data" to the AI Mapping Agent.
 
