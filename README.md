@@ -430,41 +430,6 @@ python run.py "data/labs.csv"
 
 ---
 
-## 🤝 Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
-### Development Setup
-```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
-
-# Run linting
-flake8 src/
-black src/
-
-# Run tests
-pytest tests/ --cov=src
-```
-
----
-
-## 📝 Documentation
-
-- **[Project Overview](PROJECT_OVERVIEW.md)** - Comprehensive technical documentation (20+ pages)
-- **[Architecture Overview](Nayer/01_architecture_overview.md)** - System design deep-dive
-- **[Pipeline Stages](Nayer/02_pipeline_stages.md)** - 4-stage pipeline explained
-- **[Source Data Formats](Nayer/03_source_data_formats.md)** - All supported formats
-- **[Database Schema](Nayer/04_database_schema.md)** - Table structures and DDL
-
----
-
 ## 🏆 Achievements
 
 - ✅ **95%+ mapping accuracy** with semantic caching
@@ -500,8 +465,8 @@ pytest tests/ --cov=src
 
 ## 🎓 Challenge Details
 
-**Event**: [START Hack 2026](https://starthack.ch)  
-**Challenge Provider**: [epaSOLUTIONS GmbH](https://www.epasolutions.ch)  
+**Event**: [START Hack 2026](https://starthack.eu)  
+**Challenge Provider**: [epaCC]
 **Topic**: Healthcare Data Harmonization / Data Mapping  
 
 **Team Contacts:**
