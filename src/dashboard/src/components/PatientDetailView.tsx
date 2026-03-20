@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Activity, FlaskConical, HeartPulse, Smartphone, FileText, Pill, AlertCircle, Database, Stethoscope, Pencil, Check, X, Loader2 } from "lucide-react";
+import { Activity, FlaskConical, HeartPulse, Smartphone, FileText, Pill, AlertCircle, Database, Stethoscope, Pencil, Check, X, Loader2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { fieldLabels, tableLabels, type PatientSummary, type CaseRecord } from "@/data/mockData";
@@ -238,13 +238,29 @@ const ValueCard = ({ label, value, unit, isBool, danger, mono, anomaly, refText,
   );
 };
 
+// --- Search helper ---
+function matchesSearch(label: string, value: any, colKey: string, term: string): boolean {
+  if (!term) return true;
+  const t = term.toLowerCase();
+  return (
+    label.toLowerCase().includes(t) ||
+    colKey.toLowerCase().includes(t) ||
+    (value !== null && value !== undefined && String(value).toLowerCase().includes(t))
+  );
+}
+
 // --- Remaining fields catch-all renderer ---
 function renderRemainingFields(
   row: any,
   shown: Set<string>,
-  makeSaver: (rowId: number, col: string) => (val: string) => Promise<void>
+  makeSaver: (rowId: number, col: string) => (val: string) => Promise<void>,
+  searchTerm = ''
 ) {
-  const remaining = Object.keys(row).filter((k) => !SKIP_FIELDS.has(k) && !shown.has(k));
+  const remaining = Object.keys(row).filter((k) => {
+    if (SKIP_FIELDS.has(k) || shown.has(k)) return false;
+    const label = fieldLabels[k] || k;
+    return matchesSearch(label, row[k], k, searchTerm);
+  });
   if (remaining.length === 0) return null;
   return (
     <div className="mt-3">
@@ -269,7 +285,8 @@ function renderRemainingFields(
 const renderTableData = (
   tableKey: string,
   data: any[],
-  onFix: (rowId: number, columnName: string, value: string) => Promise<void>
+  onFix: (rowId: number, columnName: string, value: string) => Promise<void>,
+  searchTerm = ''
 ) => {
   if (!data || data.length === 0) return null;
 
@@ -290,6 +307,7 @@ const renderTableData = (
                 const val = row[lp.value];
                 const flag = row[lp.flag];
                 if (val === undefined && flag === undefined) return null;
+                if (!matchesSearch(lp.label, val, lp.value, searchTerm)) return null;
                 let anomaly: string | undefined;
                 if (val !== null && val !== undefined) {
                   const num = Number(val);
@@ -313,7 +331,7 @@ const renderTableData = (
                 );
               })}
             </div>
-            {renderRemainingFields(row, LAB_SHOWN, makeSaver)}
+            {renderRemainingFields(row, LAB_SHOWN, makeSaver, searchTerm)}
           </div>
         ))}
       </div>
@@ -326,14 +344,13 @@ const renderTableData = (
         {data.map((row: any, i: number) => (
           <div key={i} className="space-y-3">
             {acDataGroups.map((group) => {
-              const hasData = group.fields.some((f) => row[f] !== undefined);
-              if (!hasData) return null;
+              const visibleFields = group.fields.filter((f) => row[f] !== undefined && matchesSearch(fieldLabels[f] || f, row[f], f, searchTerm));
+              if (visibleFields.length === 0) return null;
               return (
                 <div key={group.title}>
                   <p className="mb-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.title}</p>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-                    {group.fields.map((f) => {
-                      if (row[f] === undefined) return null;
+                    {visibleFields.map((f) => {
                       let anomaly: string | undefined;
                       let refText: string | undefined;
                       const threshold = assessmentThresholds[f];
@@ -375,7 +392,7 @@ const renderTableData = (
                 <p className="text-sm font-medium">{row.coE3I0889}</p>
               </div>
             )}
-            {renderRemainingFields(row, AC_SHOWN, makeSaver)}
+            {renderRemainingFields(row, AC_SHOWN, makeSaver, searchTerm)}
           </div>
         ))}
       </div>
@@ -389,7 +406,7 @@ const renderTableData = (
           <div key={i}>
             <p className="mb-2 text-xs text-muted-foreground">Zeitstempel: <strong className="text-foreground">{row.coTimestamp}</strong></p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-              {deviceMotionFields.map((f) => (
+              {deviceMotionFields.filter((f) => matchesSearch(f.label, row[f.key], f.key, searchTerm)).map((f) => (
                 <ValueCard
                   key={f.key}
                   label={f.label}
@@ -402,7 +419,7 @@ const renderTableData = (
                 />
               ))}
             </div>
-            {renderRemainingFields(row, DEVICE_MOTION_SHOWN, makeSaver)}
+            {renderRemainingFields(row, DEVICE_MOTION_SHOWN, makeSaver, searchTerm)}
           </div>
         ))}
       </div>
@@ -420,7 +437,7 @@ const renderTableData = (
               {row.coEvent_id && <Badge variant="secondary" className="text-[10px]">{row.coEvent_id}</Badge>}
             </div>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-              {device1HzFields.map((f) => (
+              {device1HzFields.filter((f) => matchesSearch(f.label, row[f.key], f.key, searchTerm)).map((f) => (
                 <ValueCard
                   key={f.key}
                   label={f.label}
@@ -433,7 +450,7 @@ const renderTableData = (
                 />
               ))}
             </div>
-            {renderRemainingFields(row, DEVICE_1HZ_SHOWN, makeSaver)}
+            {renderRemainingFields(row, DEVICE_1HZ_SHOWN, makeSaver, searchTerm)}
           </div>
         ))}
       </div>
@@ -451,7 +468,7 @@ const renderTableData = (
               <Badge variant="secondary" className="text-[10px]">{row.coShift}</Badge>
             </div>
             <p className="text-sm leading-relaxed">{row.coNursing_note_free_text || <NullIndicator />}</p>
-            {renderRemainingFields(row, NURSING_SHOWN, makeSaver)}
+            {renderRemainingFields(row, NURSING_SHOWN, makeSaver, searchTerm)}
           </div>
         ))}
       </div>
@@ -477,7 +494,7 @@ const renderTableData = (
               <span>Verabreichung: <strong className="text-foreground">{row.administration_status || '–'}</strong></span>
             </div>
             {row.note && <p className="mt-2 text-xs text-muted-foreground italic">📝 {row.note}</p>}
-            {renderRemainingFields(row, MED_SHOWN, makeSaver)}
+            {renderRemainingFields(row, MED_SHOWN, makeSaver, searchTerm)}
           </div>
         ))}
       </div>
@@ -495,6 +512,7 @@ const renderTableData = (
               {icdFields.map((f) => {
                 const val = row[f];
                 if (val === undefined) return null;
+                if (!matchesSearch(fieldLabels[f] || f, val, f, searchTerm)) return null;
                 return (
                   <ValueCard
                     key={f}
@@ -507,7 +525,7 @@ const renderTableData = (
                 );
               })}
             </div>
-            {renderRemainingFields(row, icdShown, makeSaver)}
+            {renderRemainingFields(row, icdShown, makeSaver, searchTerm)}
           </div>
         ))}
       </div>
@@ -559,6 +577,7 @@ const PatientDetailView = ({ patient, apiAvailable }: Props) => {
   const [patientCases, setPatientCases] = useState<CaseRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedCase, setExpandedCase] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!apiAvailable) {
@@ -567,6 +586,7 @@ const PatientDetailView = ({ patient, apiAvailable }: Props) => {
     }
     setLoading(true);
     setPatientCases([]);
+    setSearch('');
     fetchCasesForPatient(patient.patientId)
       .then((cases) => {
         setPatientCases(cases);
@@ -611,7 +631,7 @@ const PatientDetailView = ({ patient, apiAvailable }: Props) => {
     <div className="space-y-6 animate-fade-in overflow-y-auto">
       {/* Patient header */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-epa">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl gradient-epa">
             <Database className="h-5 w-5 text-primary-foreground" />
           </div>
@@ -628,6 +648,15 @@ const PatientDetailView = ({ patient, apiAvailable }: Props) => {
               <span>{patientCases.length} Fälle</span>
             </div>
           </div>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Felder, Werte oder Spaltennamen suchen…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 h-9"
+          />
         </div>
       </div>
 
@@ -691,7 +720,7 @@ const PatientDetailView = ({ patient, apiAvailable }: Props) => {
                         <Badge variant="secondary" className="ml-auto text-[10px]">{(data as any[]).length} Einträge</Badge>
                       </div>
                       <div className="p-3">
-                        {renderTableData(key, data as any[], (rowId, col, val) => handleFix(key, rowId, col, val))}
+                        {renderTableData(key, data as any[], (rowId, col, val) => handleFix(key, rowId, col, val), search)}
                       </div>
                     </div>
                   );
