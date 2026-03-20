@@ -10,7 +10,7 @@ Usage:
 Examples:
     python run.py "Endtestdaten_ohne_Fehler_ einheitliche ID/epaAC-Data-1.csv"
     python run.py "Endtestdaten_ohne_Fehler_ einheitliche ID/"
-    python run.py data/ --db output/custom.db --glob "*.csv"
+    python run.py data/ --glob "*.csv"
     python run.py "Nayer/clinic_4_nursing.pdf"  # PDF nursing data
 """
 
@@ -54,8 +54,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--db",
-        default="output/health_data.db",
-        help="Path to the SQLite output database (default: output/health_data.db).",
+        default=None,
+        help="SQLAlchemy DB URL (default: MSSQL on localhost:1433/CaseDB).",
     )
     parser.add_argument(
         "--logs",
@@ -98,7 +98,7 @@ def main() -> None:
         print(f"Processing {input_path.suffix.upper()} file: {input_path}")
         result = run_full_pipeline(
             input_path,
-            db_path=args.db,
+            db_path=args.db,  # None → MSSQL default
             log_dir=args.logs,
             output_dir=args.output_dir,
         )

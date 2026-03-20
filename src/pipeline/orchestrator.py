@@ -15,6 +15,19 @@ from pathlib import Path
 
 _IID_SID_CSV = Path(__file__).parent.parent.parent / "IID-SID-ITEM.csv"
 
+MSSQL_DEFAULT_URL = (
+    "mssql+pyodbc://SA:StartHack2026!@localhost:1433/CaseDB"
+    "?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+)
+
+
+def _to_db_url(db_path: str | Path) -> str:
+    """Convert a file path to a sqlite:// URL, or pass through if already a URL."""
+    s = str(db_path)
+    if "://" in s:
+        return s
+    return f"sqlite:///{s}"
+
 
 def _safe_sample_values(df, max_cols: int = 15) -> dict:
     """
@@ -49,19 +62,22 @@ class Pipeline:
 
     def __init__(
         self,
-        db_path: str | Path = "output/health_data.db",
+        db_path: str | Path | None = None,
         log_dir: str | Path = "logs",
         iid_sid_csv: str | Path | None = None,
     ) -> None:
         from src.pipeline.mapping_engine import MappingEngine
 
-        self.db_path = str(Path(db_path))
+        self.db_url = _to_db_url(db_path) if db_path is not None else MSSQL_DEFAULT_URL
         self.log_dir = Path(log_dir)
 
         csv_path = Path(iid_sid_csv) if iid_sid_csv else _IID_SID_CSV
         self.mapping_engine = MappingEngine(csv_path)
 
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+        # Only create parent directory when using a local SQLite file
+        if self.db_url.startswith("sqlite:///"):
+            sqlite_path = self.db_url[len("sqlite:///"):]
+            Path(sqlite_path).parent.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
     def run(self, source_path: str | Path) -> dict:
@@ -131,7 +147,7 @@ class Pipeline:
                           "sample_values": _safe_sample_values(df_norm, 15)})
 
             # Stage 4 — Write to DB
-            router = TargetRouter(db_path=self.db_path, run=run)
+            router = TargetRouter(db_url=self.db_url, run=run)
             result = router.write(df_norm, config, frame_name=source_path.name)
 
             summary = run.summary()

@@ -12,22 +12,26 @@ echo "🚀 Starting the epaCC Data Ingestion Stack..."
 echo "-----------------------------------------------------------------"
 
 # Step 1: Start the MS SQL Server Database
-echo "📦 [Step 1/4] Setting up the MS SQL Server Database..."
+echo "📦 [Step 1/5] Setting up the MS SQL Server Database..."
 bash DB/setup_mssql_docker.sh
 
 # Step 2: Inject Mock Data (with missing values to demonstrate the tool)
-echo "🧬 [Step 2/4] Injecting test data with missing values..."
+echo "🧬 [Step 2/5] Injecting test data with missing values..."
 bash DB/test-seeds/insert_mock_data_missing.sh
 
-# Step 3: Start the Backend API (FastAPI)
-echo "⚙️  [Step 3/4] Starting the Python Missing Data API..."
+# Step 3: Run the data ingestion pipeline (CSV files → MSSQL)
+echo "🔄 [Step 3/5] Running data ingestion pipeline into MSSQL..."
+python run.py "Endtestdaten_ohne_Fehler_ einheitliche ID/" --glob "*.csv"
+
+# Step 4: Start the Backend API (FastAPI)
+echo "⚙️  [Step 4/5] Starting the Python Missing Data API..."
 # We run this in the background using '&' so it doesn't block the script
 bash src/missing_data/run_api_docker.sh > /dev/null 2>&1 &
 # Give the API a few seconds to fully boot inside its container
 sleep 3
 
-# Step 4: Start the Frontend Dashboard (React)
-echo "🖥️  [Step 4/4] Starting the React Interactive Dashboard..."
+# Step 5: Start the Frontend Dashboard (React)
+echo "🖥️  [Step 5/5] Starting the React Interactive Dashboard..."
 # We run this in the background using '&'
 bash src/dashboard/run_dashboard_docker.sh > /dev/null 2>&1 &
 # Give the UI a few seconds to compile and start

@@ -93,8 +93,8 @@ CATEGORY_TABLE: dict[str, str] = {
 class TargetRouter:
     """Routes a normalised DataFrame to its target DB table."""
 
-    def __init__(self, db_path: str, run: "PipelineRun | None" = None) -> None:
-        self.db_path = db_path
+    def __init__(self, db_url: str, run: "PipelineRun | None" = None) -> None:
+        self.db_url = db_url
         self._run = run
 
     def write(
@@ -116,7 +116,7 @@ class TargetRouter:
                 data={"frame_name": frame_name, "target_table": table, "row_count": len(df)},
             )
 
-        engine = sa.create_engine(f"sqlite:///{self.db_path}", echo=False)
+        engine = sa.create_engine(self.db_url, echo=False)
 
         _ensure_table(engine, "tbCaseData", pd.DataFrame())
         _ensure_table(engine, table, df)
@@ -403,6 +403,8 @@ def _ensure_table(engine: sa.Engine, table: str, frame: pd.DataFrame) -> None:
     import re
     from src.ai_mapping.context_loader import load_target_schema
 
+    is_mssql = engine.dialect.name == "mssql"
+
     ddl = load_target_schema(table)
     col_names: list[str] = []
     if "not found" not in ddl:
@@ -431,14 +433,14 @@ def _ensure_table(engine: sa.Engine, table: str, frame: pd.DataFrame) -> None:
     col_defs_parts = []
     for c in col_names:
         if c.lower() == "coid":
-            col_defs_parts.append(f'"{c}" INTEGER PRIMARY KEY AUTOINCREMENT')
+            if is_mssql:
+                col_defs_parts.append(f'"{c}" bigint IDENTITY(1,1) PRIMARY KEY')
+            else:
+                col_defs_parts.append(f'"{c}" INTEGER PRIMARY KEY AUTOINCREMENT')
         elif c.lower() == "coe2i222" and table.lower() == "tbcasedata":
-            # Case ID must be unique in the case anchor table for upsert to work
-            col_defs_parts.append(f'"{c}" TEXT UNIQUE')
+            col_defs_parts.append(f'"{c}" NVARCHAR(256) UNIQUE' if is_mssql else f'"{c}" TEXT UNIQUE')
         else:
-            # coCaseId is NOT unique - multiple rows per case are allowed
-            # (e.g., multiple medication orders, device readings per case)
-            col_defs_parts.append(f'"{c}" TEXT')
+            col_defs_parts.append(f'"{c}" NVARCHAR(MAX)' if is_mssql else f'"{c}" TEXT')
 
     with engine.begin() as conn:
         conn.execute(sa.text(f'CREATE TABLE "{table}" ({", ".join(col_defs_parts)})'))
@@ -463,10 +465,13 @@ def _lookup_case_by_patient(conn: sa.Connection, patient_id) -> int | None:
     
     try:
         # Try to find a case with this patient ID
-        row = conn.execute(
-            sa.text('SELECT coE2I222 FROM "tbCaseData" WHERE coPatientId = :pid LIMIT 1'),
-            {"pid": str(patient_id)},
-        ).fetchone()
+        is_mssql = conn.engine.dialect.name == "mssql"
+        query = (
+            sa.text('SELECT TOP 1 coE2I222 FROM tbCaseData WHERE coPatientId = :pid')
+            if is_mssql else
+            sa.text('SELECT coE2I222 FROM "tbCaseData" WHERE coPatientId = :pid LIMIT 1')
+        )
+        row = conn.execute(query, {"pid": str(patient_id)}).fetchone()
         if row and row[0]:
             return _to_int(row[0])
     except Exception:
@@ -540,10 +545,20 @@ def _upsert_case(conn: sa.Connection, case_int: int, extra_fields: dict) -> int 
     files contribute data for the same case.
     """
     # First, ensure the case row exists
-    conn.execute(
-        sa.text('INSERT OR IGNORE INTO "tbCaseData" (coE2I222) VALUES (:cid)'),
-        {"cid": case_int},
-    )
+    is_mssql = conn.engine.dialect.name == "mssql"
+    if is_mssql:
+        conn.execute(
+            sa.text(
+                'IF NOT EXISTS (SELECT 1 FROM tbCaseData WHERE coE2I222 = :cid) '
+                'INSERT INTO tbCaseData (coE2I222) VALUES (:cid)'
+            ),
+            {"cid": case_int},
+        )
+    else:
+        conn.execute(
+            sa.text('INSERT OR IGNORE INTO "tbCaseData" (coE2I222) VALUES (:cid)'),
+            {"cid": case_int},
+        )
     
     if extra_fields:
         # Merge strategy: only update fields that are currently NULL or empty

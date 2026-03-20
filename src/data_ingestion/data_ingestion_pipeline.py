@@ -200,22 +200,22 @@ class DataIngestionPipeline:
 
 def run_full_pipeline(
     file_path: str | Path,
-    db_path: str | Path = "output/health_data.db",
+    db_path: str | Path | None = None,
     log_dir: str | Path = "logs",
     output_dir: str | Path = "output/converted",
 ) -> dict:
     """
     Run the complete pipeline: ingestion + transformation + database insertion.
-    
+
     This function bridges DataIngestionPipeline and the main Pipeline,
     handling any file type (CSV, PDF, MD) seamlessly.
-    
+
     Args:
         file_path: Input file (CSV, PDF, or Markdown)
-        db_path: Target SQLite database path
+        db_path: SQLAlchemy DB URL or file path (None = MSSQL default)
         log_dir: Directory for pipeline logs
         output_dir: Directory for converted CSV files
-        
+
     Returns:
         Pipeline result dictionary with routing results and metadata
     """
@@ -262,8 +262,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--db-path",
         type=str,
-        default="output/health_data.db",
-        help="Path to the SQLite database"
+        default=None,
+        help="SQLAlchemy DB URL (default: MSSQL on localhost:1433/CaseDB)"
     )
     parser.add_argument(
         "--output-dir",
