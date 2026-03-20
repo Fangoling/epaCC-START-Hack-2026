@@ -17,25 +17,26 @@ function getFieldLabel(col: string): string {
 }
 
 function transformBrokenEntriesToErrors(entries: BrokenEntry[]): DataError[] {
-  return entries.map((entry) => {
-    const firstCol = entry.missing_columns[0] || "";
-    const patientId = entry.patient_id ? `P-${entry.patient_id}` : "Unbekannt";
-    return {
-      id: entry.id,
-      sourceInstitution: "Unbekannt",
-      patientId,
-      dataField: getFieldLabel(firstCol),
-      tableName: entry.table,
-      columnName: firstCol,
-      errorDescription: `${getFieldLabel(firstCol)} fehlt`,
-      errorType: "missing" as const,
-      priority: "medium" as const,
-      status: "new" as const,
-      category: entry.table,
-      rowId: entry.row_id,
-      allMissingColumns: entry.missing_columns,
-    };
-  });
+  return entries.flatMap((entry) =>
+    entry.missing_columns.map((col, idx) => {
+      const patientId = entry.patient_id ? `P-${entry.patient_id}` : "Unbekannt";
+      return {
+        id: `${entry.id}-${idx}`,
+        sourceInstitution: "Unbekannt",
+        patientId,
+        dataField: getFieldLabel(col),
+        tableName: entry.table,
+        columnName: col,
+        errorDescription: `${getFieldLabel(col)} fehlt`,
+        errorType: "missing" as const,
+        priority: "medium" as const,
+        status: "new" as const,
+        category: entry.table,
+        rowId: entry.row_id,
+        allMissingColumns: entry.missing_columns,
+      };
+    })
+  );
 }
 
 const Index = () => {
