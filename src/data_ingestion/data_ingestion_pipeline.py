@@ -1,114 +1,304 @@
+"""
+Data Ingestion Pipeline - Routes files through appropriate processing paths.
+
+Handles CSV, PDF, and Markdown files, converting them to a unified format
+for downstream processing by the main Pipeline orchestrator.
+
+For PDFs (especially nursing data), uses LLM extraction to convert
+unstructured content to structured CSV format.
+"""
+
 import os
 import argparse
-import json
+import tempfile
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-from csv_reader import CSVReader
-from pdf_parser import PyMuPDFParser
-from unstructured_data_parser import UnstructuredDataParser
+if TYPE_CHECKING:
+    from src.observability import PipelineRun
+
 
 class DataIngestionPipeline:
     """
     Coordinates the ingestion of CSV, PDF, and Markdown files, processing them
-    through their respective paths to generate a unified 'Data' output for
-    the AI Mapping Agent.
+    through their respective paths to generate a unified output for the
+    main Pipeline orchestrator.
+    
+    Processing paths:
+    1. CSV files → Pass through directly (structured data)
+    2. PDF files → Convert to CSV via LLM extraction (unstructured → structured)
+    3. Markdown files → Convert to CSV via LLM extraction (unstructured → structured)
     """
+    
     def __init__(self):
-        self.csv_reader = CSVReader()
-        self.pdf_parser = PyMuPDFParser()
-        self.unstructured_parser = UnstructuredDataParser()
-
-    def process_file(self, file_path: str) -> dict:
+        # Lazy imports to avoid circular dependencies
+        pass
+    
+    def process_file(
+        self,
+        file_path: str | Path,
+        output_dir: str | Path | None = None,
+        run: "PipelineRun | None" = None,
+    ) -> dict:
         """
         Determines the file type and routes it through the correct processing path.
-        Returns a unified 'Data' dictionary ready for downstream routing.
-        """
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File '{file_path}' not found.")
-            
-        _, ext = os.path.splitext(file_path.lower())
         
-        # 1. Structured Data Path (CSV)
+        Args:
+            file_path: Path to the input file (CSV, PDF, or MD)
+            output_dir: Directory for intermediate outputs (e.g., converted CSVs)
+            run: Optional PipelineRun for observability logging
+            
+        Returns:
+            dict with:
+              - source_type: "csv", "pdf", or "markdown"
+              - csv_path: Path to CSV file (original or converted)
+              - content: Parsed data (list of dicts for CSV, or records for PDF/MD)
+              - original_path: Original input file path
+        """
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            raise FileNotFoundError(f"File '{file_path}' not found.")
+        
+        ext = file_path.suffix.lower()
+        output_dir = Path(output_dir) if output_dir else Path(tempfile.gettempdir())
+        
+        # 1. Structured Data Path (CSV) - pass through
         if ext == '.csv':
-            print(f"[Pipeline] Processing CSV file: {file_path}")
-            # The CSV Reader outputs processed 'Data' (list of dicts)
-            csv_data = self.csv_reader.parse_to_dict_list(file_path)
-            # Package it in our unified format
-            return {
-                "source_type": "csv",
-                "content": csv_data
-            }
-            
-        # 2. Unstructured Data Path (PDF)
+            print(f"[DataIngestion] Processing CSV file: {file_path}")
+            return self._process_csv(file_path, run)
+        
+        # 2. Unstructured Data Path (PDF) - convert to CSV via LLM
         elif ext == '.pdf':
-            print(f"[Pipeline] Processing PDF file: {file_path}")
-            # Process 1: The PDF Parser converts the document into "Markdown" format.
-            markdown_content = self.pdf_parser.parse_to_markdown(file_path)
-            
-            # Process 2: The generated Markdown is passed into the Unstructured Data Parser.
-            # Final Output: The Unstructured Data Parser outputs processed "Data".
-            return self.unstructured_parser.parse_markdown_string(markdown_content)
-            
-        # 3. Unstructured Data Path (Direct Markdown Files)
+            print(f"[DataIngestion] Processing PDF file: {file_path}")
+            return self._process_pdf(file_path, output_dir, run)
+        
+        # 3. Unstructured Data Path (Markdown) - convert to CSV via LLM
         elif ext == '.md':
-            print(f"[Pipeline] Processing Markdown file: {file_path}")
-            # Process: The file bypasses the PDF Parser and is ingested directly.
-            # Output: The Unstructured Data Parser outputs processed "Data".
-            return self.unstructured_parser.parse_markdown_file(file_path)
-            
+            print(f"[DataIngestion] Processing Markdown file: {file_path}")
+            return self._process_markdown(file_path, output_dir, run)
+        
         else:
             raise ValueError(f"Unsupported file type '{ext}' for file {file_path}")
-
-class AIMappingAgent:
-    """
-    The external component receiving the consolidated "Data" streams 
-    from the data_ingestion.
-    """
-    def __init__(self):
-        pass
-
-    def process(self, unified_data: dict):
-        """
-        Receives the unified data from the ingestion layer and performs
-        mapping/processing depending on the source type.
-        """
-        source_type = unified_data.get("source_type")
-        content = unified_data.get("content")
+    
+    def _process_csv(
+        self,
+        file_path: Path,
+        run: "PipelineRun | None" = None,
+    ) -> dict:
+        """Process CSV file - read and return as structured data."""
+        from src.data_ingestion.csv_reader import CSVReader
         
-        print("\n--- [AI Mapping Agent] Processing Data ---")
+        reader = CSVReader()
+        csv_data = reader.parse_to_dict_list(str(file_path))
         
-        if source_type == "csv":
-            print("Received Structured Data (CSV).")
-            # TODO: Add logic to process/map CSV dictionary lists to target ontology
-            print(f"Number of rows to map: {len(content)}")
-            print("[Placeholder] Mapping tabular data...\n")
-            
-        elif source_type == "markdown":
-            print("Received Unstructured Data (Markdown).")
-            # TODO: Add logic to use LLM to extract entities/relationships from markdown text
-            print(f"Text length to process: {len(content)} characters")
-            print("[Placeholder] Invoking LLM for NLP mapping...\n")
-            
-        else:
-            print(f"Unknown data type: {source_type}")
+        return {
+            "source_type": "csv",
+            "csv_path": str(file_path),
+            "content": csv_data,
+            "original_path": str(file_path),
+            "records_count": len(csv_data) if csv_data else 0,
+        }
+    
+    def _process_pdf(
+        self,
+        file_path: Path,
+        output_dir: Path,
+        run: "PipelineRun | None" = None,
+    ) -> dict:
+        """
+        Process PDF file - convert to CSV via LLM extraction.
+        
+        The converted CSV is saved to output_dir and can be processed
+        by the main Pipeline orchestrator.
+        """
+        from src.data_ingestion.pdf_to_csv_converter import PDFToCSVConverter
+        
+        converter = PDFToCSVConverter()
+        
+        # Generate output CSV path
+        csv_filename = file_path.stem + "_converted.csv"
+        csv_path = output_dir / csv_filename
+        
+        # Convert PDF to CSV
+        records, csv_content = converter.convert(
+            pdf_path=file_path,
+            output_csv_path=csv_path,
+            run=run,
+        )
+        
+        print(f"[DataIngestion] Converted PDF to CSV: {csv_path} ({len(records)} records)")
+        
+        return {
+            "source_type": "pdf",
+            "csv_path": str(csv_path),
+            "content": records,
+            "original_path": str(file_path),
+            "records_count": len(records),
+        }
+    
+    def _process_markdown(
+        self,
+        file_path: Path,
+        output_dir: Path,
+        run: "PipelineRun | None" = None,
+    ) -> dict:
+        """
+        Process Markdown file - convert to CSV via LLM extraction.
+        
+        Assumes the markdown contains nursing report data that can be
+        extracted to structured format.
+        """
+        from src.data_ingestion.pdf_to_csv_converter import PDFToCSVConverter
+        
+        converter = PDFToCSVConverter()
+        
+        # Read markdown content
+        markdown_content = file_path.read_text(encoding="utf-8")
+        
+        # Generate output CSV path
+        csv_filename = file_path.stem + "_converted.csv"
+        csv_path = output_dir / csv_filename
+        
+        # Convert markdown to CSV
+        records, csv_content = converter.convert_markdown(
+            markdown_content=markdown_content,
+            output_csv_path=csv_path,
+            run=run,
+        )
+        
+        print(f"[DataIngestion] Converted Markdown to CSV: {csv_path} ({len(records)} records)")
+        
+        return {
+            "source_type": "markdown",
+            "csv_path": str(csv_path),
+            "content": records,
+            "original_path": str(file_path),
+            "records_count": len(records),
+        }
+    
+    def process_to_pipeline(
+        self,
+        file_path: str | Path,
+        output_dir: str | Path | None = None,
+        run: "PipelineRun | None" = None,
+    ) -> Path:
+        """
+        Process a file and return the path to a CSV that can be fed
+        directly to the main Pipeline.run() method.
+        
+        This is a convenience method that abstracts away the conversion
+        process - you get back a CSV path regardless of input type.
+        """
+        result = self.process_file(file_path, output_dir, run)
+        return Path(result["csv_path"])
 
-# ==========================================
-# Example Usage (Downstream Routing)
-# ==========================================
+
+# ---------------------------------------------------------------------------
+# Integration with main Pipeline
+# ---------------------------------------------------------------------------
+
+def run_full_pipeline(
+    file_path: str | Path,
+    db_path: str | Path = "output/health_data.db",
+    log_dir: str | Path = "logs",
+    output_dir: str | Path = "output/converted",
+) -> dict:
+    """
+    Run the complete pipeline: ingestion + transformation + database insertion.
+    
+    This function bridges DataIngestionPipeline and the main Pipeline,
+    handling any file type (CSV, PDF, MD) seamlessly.
+    
+    Args:
+        file_path: Input file (CSV, PDF, or Markdown)
+        db_path: Target SQLite database path
+        log_dir: Directory for pipeline logs
+        output_dir: Directory for converted CSV files
+        
+    Returns:
+        Pipeline result dictionary with routing results and metadata
+    """
+    from src.pipeline.orchestrator import Pipeline
+    
+    file_path = Path(file_path)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Stage 1: Ingestion - convert to CSV if needed
+    ingestion = DataIngestionPipeline()
+    ingestion_result = ingestion.process_file(file_path, output_dir)
+    
+    csv_path = Path(ingestion_result["csv_path"])
+    
+    # Stage 2-4: Run main pipeline on the CSV
+    pipeline = Pipeline(db_path=db_path, log_dir=log_dir)
+    result = pipeline.run(csv_path)
+    
+    # Combine results
+    result["ingestion"] = {
+        "source_type": ingestion_result["source_type"],
+        "original_path": ingestion_result["original_path"],
+        "converted_csv_path": ingestion_result["csv_path"],
+        "records_extracted": ingestion_result["records_count"],
+    }
+    
+    return result
+
+
+# ---------------------------------------------------------------------------
+# CLI Entry Point
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the full Data Ingestion Pipeline")
-    parser.add_argument("file_path", type=str, help="Path to the CSV, PDF, or MD file to process.")
+    parser = argparse.ArgumentParser(
+        description="Run the full Data Ingestion Pipeline with optional database insertion"
+    )
+    parser.add_argument(
+        "file_path",
+        type=str,
+        help="Path to the CSV, PDF, or MD file to process"
+    )
+    parser.add_argument(
+        "--db-path",
+        type=str,
+        default="output/health_data.db",
+        help="Path to the SQLite database"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output/converted",
+        help="Directory for converted CSV files"
+    )
+    parser.add_argument(
+        "--ingest-only",
+        action="store_true",
+        help="Only run ingestion (convert to CSV), don't run full pipeline"
+    )
     
     args = parser.parse_args()
     
-    pipeline = DataIngestionPipeline()
-    ai_agent = AIMappingAgent()
-    
     try:
-        # 1. The pipeline processes the raw input into unified 'Data'
-        unified_data_output = pipeline.process_file(args.file_path)
-        
-        # 2. The combined data stream is routed upwards to the AI Mapping Agent
-        ai_agent.process(unified_data_output)
-        
+        if args.ingest_only:
+            # Just convert to CSV
+            ingestion = DataIngestionPipeline()
+            result = ingestion.process_file(args.file_path, args.output_dir)
+            print(f"\nIngestion complete!")
+            print(f"  Source type: {result['source_type']}")
+            print(f"  Records: {result['records_count']}")
+            print(f"  CSV path: {result['csv_path']}")
+        else:
+            # Run full pipeline
+            result = run_full_pipeline(
+                args.file_path,
+                db_path=args.db_path,
+                output_dir=args.output_dir,
+            )
+            print(f"\nPipeline complete!")
+            print(f"  Source: {result.get('ingestion', {}).get('original_path')}")
+            print(f"  Records inserted: {result.get('routing_result', {}).get('rows_written', 0)}")
+            
     except Exception as e:
         print(f"Pipeline Execution Failed: {e}")
+        raise
