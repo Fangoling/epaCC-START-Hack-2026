@@ -217,4 +217,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+/Nayer/*
+/plans/*
+
+.DS_Store
 src/dashboard/node_modules/

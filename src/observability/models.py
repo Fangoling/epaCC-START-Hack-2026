@@ -16,6 +16,14 @@ class EventType(str, Enum):
     # ── Inspection ──────────────────────────────────────────────────────────
     FILE_INSPECTED = "file_inspected"       # FileProfile produced
 
+    # ── Schema discovery ────────────────────────────────────────────────────
+    SCHEMA_DISCOVERED = "schema_discovered" # SchemaConfig produced by AI
+
+    # ── LLM calls ───────────────────────────────────────────────────────────
+    LLM_CALL_STARTED = "llm_call_started"   # prompt + model sent to LLM
+    LLM_CALL_COMPLETED = "llm_call_completed" # response received + timing
+    LLM_CALL_RETRY = "llm_call_retry"       # connection retry with backoff
+
     # ── Planning ────────────────────────────────────────────────────────────
     PLAN_GENERATED = "plan_generated"       # PreprocessingPlan + LLM rationale
 
@@ -33,9 +41,15 @@ class EventType(str, Enum):
     QUALITY_ISSUE = "quality_issue"         # one flagged cell / row
     QUALITY_COMPLETED = "quality_completed" # summary: N errors, M warnings
 
+    # ── Transformation ──────────────────────────────────────────────────────
+    TRANSFORM_STARTED = "transform_started"     # raw df shape + config summary
+    TRANSFORM_STEP = "transform_step"           # one named step with row/col delta
+    TRANSFORM_COMPLETED = "transform_completed" # final shape + unmapped count
+
     # ── Routing ─────────────────────────────────────────────────────────────
     ROUTE_DECIDED = "route_decided"         # df_name → target_table
     ROUTING_COMPLETED = "routing_completed" # insert_count + update_count per table
+    WRITE_ERROR = "write_error"             # single row write failure
 
     # ── Pipeline lifecycle ──────────────────────────────────────────────────
     PIPELINE_STARTED = "pipeline_started"

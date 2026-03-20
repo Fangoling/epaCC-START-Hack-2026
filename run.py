@@ -25,14 +25,17 @@ def print_result(result: dict) -> None:
         print(f"  ERROR: {result['error']}")
         return
 
-    frames = result.get("frames", {})
-    routing = result.get("routing_results", [])
-    total_inserts = sum(r.get("inserts", 0) for r in routing)
-    total_updates = sum(r.get("updates", 0) for r in routing)
-    total_errors  = sum(r.get("errors",  0) for r in routing)
+    # Support both old format (routing_results: list) and new format (routing_result: dict)
+    routing_results = result.get("routing_results")
+    if routing_results is None:
+        rr = result.get("routing_result")
+        routing_results = [rr] if rr else []
 
-    print(f"  frames : {', '.join(f'{k}={v} rows' for k, v in frames.items())}")
-    for r in routing:
+    total_inserts = sum(r.get("inserts", 0) for r in routing_results)
+    total_updates = sum(r.get("updates", 0) for r in routing_results)
+    total_errors  = sum(r.get("errors",  0) for r in routing_results)
+
+    for r in routing_results:
         print(f"  table  : {r['table']} — "
               f"{r['inserts']} inserts, {r['updates']} updates, {r['errors']} errors")
     print(f"  total  : {total_inserts} inserts, {total_updates} updates, {total_errors} errors")
