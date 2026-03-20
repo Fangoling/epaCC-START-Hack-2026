@@ -9,8 +9,6 @@
 
 Built for the **START Hack 2026** challenge by **epaSOLUTIONS GmbH**, this solution automates the complex process of ingesting, mapping, and transforming data from multiple hospitals—regardless of format (CSV, Excel, PDF, free-text)—into a standardized Microsoft SQL Server schema.
 
-![epaCC Dashboard Preview](https://via.placeholder.com/800x400/4A90E2/FFFFFF?text=Interactive+Dashboard+Preview)
-
 ---
 
 ## 🎯 The Problem
@@ -78,25 +76,6 @@ bash start_everything.sh
 ```bash
 bash stop_everything.sh
 ```
-
----
-
-## 📸 Screenshots
-
-### Data Quality Dashboard
-Monitor completeness across all clinical tables with real-time metrics.
-
-![Dashboard Screenshot](https://via.placeholder.com/800x400/2ECC71/FFFFFF?text=Data+Quality+Dashboard)
-
-### Patient Detail View
-Drill down into individual cases to identify missing fields and data issues.
-
-![Patient View Screenshot](https://via.placeholder.com/800x400/E74C3C/FFFFFF?text=Patient+Detail+View)
-
-### Manual Remediation
-Correct mapping errors directly through the UI with full audit trail.
-
-![Correction Dialog Screenshot](https://via.placeholder.com/800x400/F39C12/FFFFFF?text=Manual+Correction+Dialog)
 
 ---
 
@@ -406,61 +385,6 @@ The epaAC assessment table has 265 columns, but 70-90% are NULL **by design**. T
 
 ---
 
-## 📁 Repository Structure
-
-```
-epaCC-START-Hack-2026/
-├── src/
-│   ├── data_ingestion/          # File parsers
-│   │   ├── csv_reader.py
-│   │   ├── pdf_parser.py
-│   │   ├── pdf_to_csv_converter.py      ← NEW: LLM PDF extraction
-│   │   └── data_ingestion_pipeline.py   ← UPDATED: Full integration
-│   ├── ai_mapping/              # AI mapping engine
-│   │   ├── ollama_client.py     # Ollama LLM client
-│   │   ├── semantic_mapper.py   # Column name matching
-│   │   ├── cleaners.py          # Deterministic transformations
-│   │   └── mapping_engine.py    # IID-SID codebook lookup
-│   ├── pipeline/                # 4-stage pipeline
-│   │   ├── orchestrator.py      # Main controller
-│   │   ├── inspector.py         # Stage 1: Preflight
-│   │   ├── schema_discovery.py  # Stage 2: AI discovery
-│   │   ├── transformation_engine.py  # Stage 3: Transform
-│   │   └── router.py            # Stage 4: Database insert
-│   ├── missing_data/            # Missing data API
-│   │   ├── missing_data_api.py  # FastAPI backend
-│   │   └── db_handler.py        # Database access layer
-│   ├── dashboard/               # React UI
-│   │   ├── src/
-│   │   │   ├── components/      # UI components
-│   │   │   ├── pages/           # Page views
-│   │   │   └── lib/             # Utilities
-│   │   └── Dockerfile
-│   └── observability/           # Logging & metrics
-│       └── run.py
-├── DB/
-│   ├── CreateImportTables.sql   # Database schema (8 tables)
-│   ├── setup_mssql_docker.sh
-│   └── test-seeds/              # Mock data with missing values
-├── Nayer/                       # Alternative pipeline + docs
-│   ├── 01_architecture_overview.md
-│   ├── 02_pipeline_stages.md
-│   ├── 03_source_data_formats.md
-│   ├── 04_database_schema.md
-│   └── ...                      # 8 documentation files
-├── Endtestdaten_ohne_Fehler_ einheitliche ID/  # Clean test data
-├── Endtestdaten_mit_Fehlern_ einheitliche ID/  # Error scenarios
-├── IID-SID-ITEM.csv             # Medical code codebook (7,881 codes)
-├── run.py                       # CLI entry point
-├── start_everything.sh          # One-command deployment
-├── stop_everything.sh
-├── requirements.txt
-├── PROJECT_OVERVIEW.md          # Detailed technical documentation
-└── README.md                    # This file
-```
-
----
-
 ## 🛠️ Manual Installation (Without Docker)
 
 ### 1. Prerequisites
@@ -617,7 +541,7 @@ pytest tests/ --cov=src
 
 **Special Thanks:**
 - START Hack organizers
-- epaSOLUTIONS team for the challenge
+- epaCC team for the challenge
 - All mentors and judges
 
 ---
