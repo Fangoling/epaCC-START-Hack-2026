@@ -7,6 +7,7 @@ Each tool is also usable as a plain Python function when smolagents is not neede
 from __future__ import annotations
 
 import csv
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -20,6 +21,21 @@ _IID_SID_PATH = Path(__file__).parent.parent.parent / "IID-SID-ITEM.csv"
 
 # Lazily built lookup dict: normalised_name → IID code
 _NAME_TO_IID: dict[str, str] | None = None
+_NAME_TO_IID_LOCK = threading.Lock()
+
+# Cached SQLAlchemy engines keyed by db_path
+_ENGINE_CACHE: dict[str, "Engine"] = {}
+_ENGINE_LOCK = threading.Lock()
+
+
+def _get_engine(db_path: str) -> "Engine":
+    """Return a cached SQLAlchemy engine for the given db_path."""
+    if db_path not in _ENGINE_CACHE:
+        with _ENGINE_LOCK:
+            if db_path not in _ENGINE_CACHE:
+                from sqlalchemy import create_engine
+                _ENGINE_CACHE[db_path] = create_engine(f"sqlite:///{db_path}", echo=False)
+    return _ENGINE_CACHE[db_path]
 
 
 def _build_name_index() -> dict[str, str]:
@@ -56,27 +72,30 @@ def check_case_exists(case_id: int, db_path: str) -> dict:
           - row_id (int | None): The coId of the existing row, or None.
           - existing_data (dict | None): Current field values, or None.
     """
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import inspect, text
 
-    engine = create_engine(f"sqlite:///{db_path}", echo=False)
+    engine = _get_engine(db_path)
+
+    # Derive column names from actual schema instead of hardcoding
+    col_names = [c["name"] for c in inspect(engine).get_columns("tbCaseData")]
+
     with engine.connect() as conn:
+        col_list = ", ".join(f'"{c}"' for c in col_names)
         row = conn.execute(
-            text("SELECT coId, coPatientId, coE2I223, coE2I228, coGender "
-                 "FROM tbCaseData WHERE coE2I222 = :cid LIMIT 1"),
+            text(f"SELECT {col_list} FROM tbCaseData WHERE coE2I222 = :cid LIMIT 1"),
             {"cid": case_id},
         ).fetchone()
 
     if row is None:
         return {"exists": False, "action": "INSERT", "row_id": None, "existing_data": None}
 
-    existing = {
-        "coId": row[0],
-        "coPatientId": row[1],
-        "coE2I223": row[2],
-        "coE2I228": row[3],
-        "coGender": row[4],
+    existing = dict(zip(col_names, row))
+    return {
+        "exists": True,
+        "action": "UPDATE",
+        "row_id": existing.get("coId"),
+        "existing_data": existing,
     }
-    return {"exists": True, "action": "UPDATE", "row_id": row[0], "existing_data": existing}
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +116,9 @@ def lookup_iid_for_column(column_name: str) -> str | None:
     """
     global _NAME_TO_IID
     if _NAME_TO_IID is None:
-        _NAME_TO_IID = _build_name_index()
+        with _NAME_TO_IID_LOCK:
+            if _NAME_TO_IID is None:
+                _NAME_TO_IID = _build_name_index()
 
     key = column_name.strip().lower()
     return _NAME_TO_IID.get(key)
@@ -118,9 +139,9 @@ def list_db_tables(db_path: str) -> list[str]:
     Returns:
         List of table name strings.
     """
-    from sqlalchemy import create_engine, inspect
+    from sqlalchemy import inspect
 
-    engine = create_engine(f"sqlite:///{db_path}", echo=False)
+    engine = _get_engine(db_path)
     return inspect(engine).get_table_names()
 
 
@@ -140,8 +161,8 @@ def get_table_columns(table_name: str, db_path: str) -> list[str]:
     Returns:
         List of column name strings.
     """
-    from sqlalchemy import create_engine, inspect
+    from sqlalchemy import inspect
 
-    engine = create_engine(f"sqlite:///{db_path}", echo=False)
+    engine = _get_engine(db_path)
     cols = inspect(engine).get_columns(table_name)
     return [c["name"] for c in cols]

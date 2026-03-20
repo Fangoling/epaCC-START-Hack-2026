@@ -10,11 +10,15 @@ Loads and formats:
 from __future__ import annotations
 
 import csv
+import functools
 import io
+import logging
 import re
 from pathlib import Path
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Paths (relative to project root — adjust via env if needed)
@@ -130,6 +134,16 @@ Drop columns whose names start with ZWrt_ or ZDat_ (change-tracking timestamps).
 # 3. Target Schema
 # ---------------------------------------------------------------------------
 
+@functools.lru_cache(maxsize=None)
+def _read_sql_ddl() -> str:
+    """Read and cache the SQL DDL file contents.
+
+    Note: cached for the process lifetime. Call ``_read_sql_ddl.cache_clear()``
+    if the DDL file changes at runtime.
+    """
+    return SQL_PATH.read_text(encoding="utf-8", errors="replace")
+
+
 def load_target_schema(table_name: str) -> str:
     """
     Extract the CREATE TABLE block for `table_name` from the SQL DDL file
@@ -138,7 +152,7 @@ def load_target_schema(table_name: str) -> str:
     Uses depth-tracking parenthesis matching so that type expressions like
     nvarchar(256) do not prematurely end the match.
     """
-    sql = SQL_PATH.read_text(encoding="utf-8", errors="replace")
+    sql = _read_sql_ddl()
     # Find the opening of the CREATE TABLE block
     pattern = rf"create\s+table\s+{re.escape(table_name)}\s*\("
     match = re.search(pattern, sql, re.IGNORECASE)
@@ -159,7 +173,7 @@ def load_target_schema(table_name: str) -> str:
 
 def list_target_tables() -> list[str]:
     """Return all table names defined in the DDL file."""
-    sql = SQL_PATH.read_text(encoding="utf-8", errors="replace")
+    sql = _read_sql_ddl()
     return re.findall(r"create\s+table\s+(\w+)", sql, re.IGNORECASE)
 
 
@@ -187,16 +201,25 @@ def load_source_sample(source_path: str | Path, n: int = SAMPLE_ROWS) -> tuple[s
     suffix = path.suffix.lower()
 
     if suffix == ".xlsx":
-        df = pd.read_excel(path, nrows=n + 2)  # +2 for potential header rows
+        try:
+            df = pd.read_excel(path, nrows=n + 2)  # +2 for potential header rows
+        except Exception as exc:
+            logger.warning("XLSX parse failed: %s", exc)
+            df = pd.DataFrame()
     else:
         # Try semicolon first, fall back to comma
         try:
             df = pd.read_csv(path, sep=";", nrows=n, encoding="utf-8-sig")
             if len(df.columns) == 1:
                 df = pd.read_csv(path, sep=",", nrows=n, encoding="utf-8-sig")
-        except Exception:
-            df = pd.read_csv(path, sep=",", nrows=n, encoding="utf-8-sig",
-                             errors="replace")
+        except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as exc:
+            logger.warning("CSV parse failed with ';' delimiter, retrying with ',': %s", exc)
+            try:
+                df = pd.read_csv(path, sep=",", nrows=n, encoding="utf-8-sig",
+                                 errors="replace")
+            except Exception as exc2:
+                logger.warning("CSV parse failed entirely: %s", exc2)
+                df = pd.DataFrame()
 
     df = df.head(n)
     headers_str = ", ".join(str(c) for c in df.columns)

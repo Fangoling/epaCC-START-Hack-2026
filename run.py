@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Run the epaCC processing pipeline on a single file or a folder of CSV files.
+Run the epaCC processing pipeline on a single file or a folder of files.
+
+Supports CSV files directly, and PDF/Markdown files via LLM extraction.
 
 Usage:
     python run.py <file_or_folder> [options]
@@ -9,6 +11,7 @@ Examples:
     python run.py "Endtestdaten_ohne_Fehler_ einheitliche ID/epaAC-Data-1.csv"
     python run.py "Endtestdaten_ohne_Fehler_ einheitliche ID/"
     python run.py data/ --db output/custom.db --glob "*.csv"
+    python run.py "Nayer/clinic_4_nursing.pdf"  # PDF nursing data
 """
 
 from __future__ import annotations
@@ -47,7 +50,7 @@ def main() -> None:
     )
     parser.add_argument(
         "input",
-        help="Path to a CSV file or a directory containing CSV files.",
+        help="Path to a file (CSV, PDF, MD) or a directory containing files.",
     )
     parser.add_argument(
         "--db",
@@ -63,6 +66,11 @@ def main() -> None:
         "--glob",
         default="*.csv",
         help="Glob pattern when input is a directory (default: *.csv).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="output/converted",
+        help="Directory for converted files from PDF/MD (default: output/converted).",
     )
     parser.add_argument(
         "--stop-on-error",
@@ -82,6 +90,29 @@ def main() -> None:
         print(f"Error: '{input_path}' does not exist.", file=sys.stderr)
         sys.exit(1)
 
+    # Check if this is a PDF or Markdown file that needs conversion
+    if input_path.is_file() and input_path.suffix.lower() in ('.pdf', '.md'):
+        # Use the full ingestion pipeline for PDF/MD files
+        from src.data_ingestion.data_ingestion_pipeline import run_full_pipeline
+        
+        print(f"Processing {input_path.suffix.upper()} file: {input_path}")
+        result = run_full_pipeline(
+            input_path,
+            db_path=args.db,
+            log_dir=args.logs,
+            output_dir=args.output_dir,
+        )
+        
+        if args.output_json:
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            ingestion = result.get("ingestion", {})
+            print(f"  source : {ingestion.get('source_type', '?')}")
+            print(f"  records: {ingestion.get('records_extracted', 0)} extracted")
+            print_result(result)
+        return
+
+    # Standard CSV pipeline
     from src.pipeline.orchestrator import Pipeline
 
     pipeline = Pipeline(db_path=args.db, log_dir=args.logs)

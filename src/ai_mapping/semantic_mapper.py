@@ -7,15 +7,19 @@ Results are cached to avoid repeated LLM calls for the same column names.
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
+import logging
+import threading
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from src.observability import PipelineRun
+
+logger = logging.getLogger(__name__)
 
 
 # Cache file for storing learned mappings
@@ -93,8 +97,17 @@ class SemanticColumnMapper:
         "primary_icd10_description_en": "coDrgName",
     }
     
-    def __init__(self):
+    # Category keywords for grouping DDL columns in prompts (immutable constant)
+    _CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
+        "identifiers": ("id", "e2i222"),
+        "demographics": ("gender", "age", "name", "birth"),
+        "dates": ("date", "e2i223", "e2i228"),
+        "clinical": ("icd", "drg", "state", "stay", "type"),
+    }
+
+    def __init__(self) -> None:
         self._cache: dict[str, str | None] = {}
+        self._cache_lock = threading.Lock()
         self._load_cache()
     
     def _load_cache(self) -> None:
@@ -105,16 +118,23 @@ class SemanticColumnMapper:
                     self._cache = json.load(f)
             except (json.JSONDecodeError, IOError):
                 self._cache = {}
-    
-    def _save_cache(self) -> None:
-        """Save cached mappings to disk."""
+
+    def _save_cache(self, snapshot: dict[str, str | None] | None = None) -> None:
+        """Save cached mappings to disk.
+
+        Args:
+            snapshot: Pre-copied cache dict to write. If None, copies self._cache
+                      (caller must NOT hold _cache_lock when snapshot is None).
+        """
+        if snapshot is None:
+            snapshot = dict(self._cache)
         _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(_CACHE_FILE, "w") as f:
-            json.dump(self._cache, f, indent=2)
+            json.dump(snapshot, f, indent=2)
     
     def _cache_key(self, source_col: str, ddl_columns: list[str]) -> str:
         """Generate a cache key for a source column + available DDL columns."""
-        ddl_hash = hashlib.md5(",".join(sorted(ddl_columns)).encode()).hexdigest()[:8]
+        ddl_hash = hashlib.sha256(",".join(sorted(ddl_columns)).encode()).hexdigest()[:8]
         return f"{source_col.lower()}:{ddl_hash}"
     
     def map_column(
@@ -143,28 +163,31 @@ class SemanticColumnMapper:
         
         # 2. Check cache
         cache_key = self._cache_key(source_col, ddl_columns)
-        if cache_key in self._cache:
-            cached = self._cache[cache_key]
-            # Verify cached value is still valid
-            if cached is None or cached in ddl_columns:
-                return cached
-        
+        with self._cache_lock:
+            if cache_key in self._cache:
+                cached = self._cache[cache_key]
+                # Verify cached value is still valid
+                if cached is None or cached in ddl_columns:
+                    return cached
+
         # 3. Use LLM for semantic matching
         try:
-            result = self._llm_map_columns([source_col], ddl_columns, 
+            result = self._llm_map_columns([source_col], ddl_columns,
                                            {source_col: sample_values} if sample_values else None,
                                            run)
             mapped = result.get(source_col)
-            
-            # Cache the result
-            self._cache[cache_key] = mapped
-            self._save_cache()
-            
+
+            # Cache the result — copy under lock, write outside lock
+            with self._cache_lock:
+                self._cache[cache_key] = mapped
+                snapshot = dict(self._cache)
+            self._save_cache(snapshot)
+
             return mapped
         except Exception as e:
             if run:
                 from src.observability.models import EventType
-                run.log(EventType.OP_STARTED, stage="semantic_mapping", 
+                run.log(EventType.OP_FAILED, stage="semantic_mapping",
                        data={"error": str(e), "source_col": source_col})
             return None
     
@@ -192,38 +215,38 @@ class SemanticColumnMapper:
             
             # 2. Check cache
             cache_key = self._cache_key(col, ddl_columns)
-            if cache_key in self._cache:
-                cached = self._cache[cache_key]
-                if cached is None or cached in ddl_columns:
-                    result[col] = cached
-                    continue
-            
+            with self._cache_lock:
+                if cache_key in self._cache:
+                    cached = self._cache[cache_key]
+                    if cached is None or cached in ddl_columns:
+                        result[col] = cached
+                        continue
+
             # Need LLM for this column
             cols_to_query.append(col)
-        
+
         # 3. Batch LLM call for uncached columns
         if cols_to_query:
             try:
                 llm_results = self._llm_map_columns(
-                    cols_to_query, 
+                    cols_to_query,
                     ddl_columns,
                     {k: v for k, v in (sample_values or {}).items() if k in cols_to_query},
                     run
                 )
-                
-                for col in cols_to_query:
-                    mapped = llm_results.get(col)
-                    result[col] = mapped
-                    
-                    # Cache the result
-                    cache_key = self._cache_key(col, ddl_columns)
-                    self._cache[cache_key] = mapped
-                
-                self._save_cache()
+
+                with self._cache_lock:
+                    for col in cols_to_query:
+                        mapped = llm_results.get(col)
+                        result[col] = mapped
+                        cache_key = self._cache_key(col, ddl_columns)
+                        self._cache[cache_key] = mapped
+                    snapshot = dict(self._cache)
+                self._save_cache(snapshot)
             except Exception as e:
                 if run:
                     from src.observability.models import EventType
-                    run.log(EventType.OP_STARTED, stage="semantic_mapping",
+                    run.log(EventType.OP_FAILED, stage="semantic_mapping",
                            data={"error": str(e), "cols_to_query": cols_to_query})
                 # Mark all as unmapped
                 for col in cols_to_query:
@@ -273,18 +296,13 @@ class SemanticColumnMapper:
         """Build the prompt for column mapping."""
         
         # Group DDL columns by category for better context
-        ddl_by_category = {
-            "identifiers": [c for c in ddl_columns if any(x in c.lower() for x in ["id", "e2i222"])],
-            "demographics": [c for c in ddl_columns if any(x in c.lower() for x in ["gender", "age", "name", "birth"])],
-            "dates": [c for c in ddl_columns if any(x in c.lower() for x in ["date", "e2i223", "e2i228"])],
-            "clinical": [c for c in ddl_columns if any(x in c.lower() for x in ["icd", "drg", "state", "stay", "type"])],
-            "other": [c for c in ddl_columns if c not in sum([
-                [c for c in ddl_columns if any(x in c.lower() for x in ["id", "e2i222"])],
-                [c for c in ddl_columns if any(x in c.lower() for x in ["gender", "age", "name", "birth"])],
-                [c for c in ddl_columns if any(x in c.lower() for x in ["date", "e2i223", "e2i228"])],
-                [c for c in ddl_columns if any(x in c.lower() for x in ["icd", "drg", "state", "stay", "type"])],
-            ], [])]
-        }
+        seen: set[str] = set()
+        ddl_by_category: dict[str, list[str]] = {}
+        for cat_name, keywords in self._CATEGORY_KEYWORDS.items():
+            matched = [c for c in ddl_columns if any(x in c.lower() for x in keywords)]
+            ddl_by_category[cat_name] = matched
+            seen.update(matched)
+        ddl_by_category["other"] = [c for c in ddl_columns if c not in seen]
         
         prompt = f"""You are a healthcare data integration expert. Map source CSV columns to target database (DDL) columns.
 
@@ -332,22 +350,25 @@ Return a JSON mapping of source column names to DDL column names (or null if no 
         return prompt
 
 
-# Global singleton instance
+# Global singleton instance (thread-safe)
 _mapper: SemanticColumnMapper | None = None
+_mapper_lock = threading.Lock()
 
 
 def get_semantic_mapper() -> SemanticColumnMapper:
-    """Get the global semantic mapper instance."""
+    """Get the global semantic mapper instance (thread-safe)."""
     global _mapper
     if _mapper is None:
-        _mapper = SemanticColumnMapper()
+        with _mapper_lock:
+            if _mapper is None:
+                _mapper = SemanticColumnMapper()
     return _mapper
 
 
 def map_source_to_case_fields(
-    row_dict: dict,
+    row_dict: dict[str, Any],
     run: "PipelineRun | None" = None,
-) -> dict[str, any]:
+) -> dict[str, Any]:
     """
     Extract case fields from a source row using semantic mapping.
     
@@ -385,7 +406,7 @@ def map_source_to_case_fields(
     )
     
     # Build result with mapped values
-    result: dict[str, any] = {}
+    result: dict[str, Any] = {}
     for src_col, ddl_col in mappings.items():
         if ddl_col and src_col in row_dict:
             val = row_dict[src_col]

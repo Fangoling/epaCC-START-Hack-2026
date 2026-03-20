@@ -77,4 +77,4 @@ class MappingEngine:
         return list(self._sid_to_iid.keys())[:n]
 
     def get_sample_iids(self, n: int = 20) -> list[str]:
-        return list(self._iid_set)[:n]
+        return sorted(self._iid_set)[:n]
