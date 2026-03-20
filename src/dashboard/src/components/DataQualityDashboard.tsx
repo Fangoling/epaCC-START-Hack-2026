@@ -80,6 +80,8 @@ const DataQualityDashboard = ({ errors }: Props) => {
       setCorrectedIds((prev) => new Set(prev).add(errorId));
       setSelectedError(null);
       toast.success('Korrektur gespeichert');
+      // Re-fetch quality metrics so the bars update immediately
+      fetchQualityMetrics().then(setMetrics).catch(() => {});
     } catch {
       toast.error('Fehler beim Speichern der Korrektur');
     }
