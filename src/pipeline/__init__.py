@@ -1,12 +1,12 @@
 from .orchestrator import Pipeline
-from .models import FileProfile, PreprocessingPlan, PreprocessingStep, RoutingResult
-from .preprocessors import PreprocessorRegistry
+from .models import FileProfile, EpaStructure, SchemaConfig, RoutingResult
+from .mapping_engine import MappingEngine
 
 __all__ = [
     "Pipeline",
     "FileProfile",
-    "PreprocessingPlan",
-    "PreprocessingStep",
+    "EpaStructure",
+    "SchemaConfig",
     "RoutingResult",
-    "PreprocessorRegistry",
+    "MappingEngine",
 ]
