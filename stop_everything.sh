@@ -29,13 +29,12 @@ if [ "$(docker ps -aq -f name=case-db)" ]; then
     docker rm case-db > /dev/null
 fi
 
-# Also check for the old name just in case
-if [ "$(docker ps -aq -f name=hack2026-db)" ]; then
-    echo "[INFO] Stopping old Database (hack2026-db)..."
-    docker stop hack2026-db > /dev/null
-    docker rm hack2026-db > /dev/null
-fi
+# Remove project-specific Docker images
+echo "[INFO] Removing project Docker images..."
+docker rmi missing-data-api:latest > /dev/null 2>&1 && echo "[INFO] Removed image: missing-data-api" || echo "[SKIP] Image missing-data-api not found."
+docker rmi missing-data-dashboard:latest > /dev/null 2>&1 && echo "[INFO] Removed image: missing-data-dashboard" || echo "[SKIP] Image missing-data-dashboard not found."
+docker rmi mcr.microsoft.com/mssql/server:2022-latest > /dev/null 2>&1 && echo "[INFO] Removed image: mssql/server" || echo "[SKIP] Image mssql/server not found or still in use."
 
 echo "-----------------------------------------------------------------"
-echo "✅ All project containers have been successfully stopped and removed."
+echo "✅ All project containers and images have been successfully stopped and removed."
 echo "================================================================="

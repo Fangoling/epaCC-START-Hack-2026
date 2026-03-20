@@ -222,3 +222,4 @@ __marimo__/
 /plans/*
 
 .DS_Store
+src/dashboard/node_modules/

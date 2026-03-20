@@ -1,25 +1,23 @@
-# Step 1: Base image
-FROM node:18-alpine
+# Build stage
+FROM oven/bun:1-alpine AS builder
 
-# Step 2: Set working directory
 WORKDIR /app
 
-# Step 3: Install dependencies
-# We are creating a minimal package.json just to install react-scripts to run the component easily
-COPY package.json ./
-RUN npm install
+COPY package.json bun.lock* ./
+RUN bun install
 
-# Step 4: Copy the dashboard files
-# We will copy the dashboard files into a standard create-react-app structure inside the container
-COPY . ./src/dashboard/
+COPY . .
+RUN bun run build
 
-# Step 5: Add a basic index.js and index.html to render the Dashboard component
-RUN mkdir -p public && \
-    echo '<!DOCTYPE html><html lang="en"><head><title>Missing Data Dashboard</title></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>' > public/index.html && \
-    echo "import React from 'react'; import ReactDOM from 'react-dom/client'; import Dashboard from './dashboard/Dashboard'; const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<React.StrictMode><Dashboard /></React.StrictMode>);" > src/index.js
+# Production stage - serve the built static files
+FROM node:18-alpine
 
-# Step 6: Expose the port React runs on
+WORKDIR /app
+
+RUN npm install -g serve
+
+COPY --from=builder /app/dist ./dist
+
 EXPOSE 3000
 
-# Step 7: Run the app
-CMD ["npm", "start"]
+CMD ["serve", "-s", "dist", "-l", "3000"]
