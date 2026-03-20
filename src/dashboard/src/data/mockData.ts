@@ -348,13 +348,13 @@ export const fieldLabels: Record<string, string> = {
 };
 
 export const tableLabels: Record<string, { full: string; short: string }> = {
-  acData: { full: 'tblImportAcData', short: 'Pflegebewertungen (Assessment/Care)' },
-  labsData: { full: 'tblImportLabsData', short: 'Laborwerte' },
-  icd10Data: { full: 'tblImportIcd10Data', short: 'ICD-10 Diagnosen & OPS' },
-  deviceMotion: { full: 'tblImportDeviceMotionData', short: 'Geräte-Bewegungsdaten' },
-  device1HzMotion: { full: 'tblImportDevice1HzMotionData', short: '1Hz Hochfrequenz-Sensordaten' },
-  medication: { full: 'tblImportMedicationInpatientData', short: 'Medikation (stationär)' },
-  nursingReports: { full: 'tblImportNursingDailyReportsData', short: 'Pflegetagesberichte' },
+  acData: { full: 'tbImportAcData', short: 'Pflegebewertungen (Assessment/Care)' },
+  labsData: { full: 'tbImportLabsData', short: 'Laborwerte' },
+  icd10Data: { full: 'tbImportIcd10Data', short: 'ICD-10 Diagnosen & OPS' },
+  deviceMotion: { full: 'tbImportDeviceMotionData', short: 'Geräte-Bewegungsdaten' },
+  device1HzMotion: { full: 'tbImportDevice1HzMotionData', short: '1Hz Hochfrequenz-Sensordaten' },
+  medication: { full: 'tbImportMedicationInpatientData', short: 'Medikation (stationär)' },
+  nursingReports: { full: 'tbImportNursingDailyReportsData', short: 'Pflegetagesberichte' },
 };
 
 // ===== Mock Data =====

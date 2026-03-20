@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { X, CheckCircle2 } from "lucide-react";
+import { X, CheckCircle2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type DataError, fieldLabels } from "@/data/mockData";
+import { getFieldFormat } from "@/lib/fieldFormat";
 
 // Case-insensitive lookup for column names coming from the API (which lowercases them)
 const fieldLabelsLower = Object.fromEntries(
@@ -20,9 +20,34 @@ interface Props {
 }
 
 const CorrectionDialog = ({ error, onClose, onCorrect }: Props) => {
-  const allColumns = error.allMissingColumns || [error.columnName];
-  const [selectedColumn, setSelectedColumn] = useState(error.columnName || allColumns[0] || '');
+  const column = error.columnName || '';
+  const format = getFieldFormat(column);
+
   const [value, setValue] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+
+  const handleChange = (v: string) => {
+    setValue(v);
+    if (touched) {
+      setValidationError(v ? format.validate(v) : null);
+    }
+  };
+
+  const handleBlur = () => {
+    setTouched(true);
+    if (value) setValidationError(format.validate(value));
+  };
+
+  const handleSubmit = () => {
+    setTouched(true);
+    const err = value ? format.validate(value) : null;
+    setValidationError(err);
+    if (!value || err) return;
+    onCorrect(error.id, format.transform(value), '', 'save');
+  };
+
+  const isInvalid = touched && !!validationError;
 
   return (
     <div
@@ -53,52 +78,46 @@ const CorrectionDialog = ({ error, onClose, onCorrect }: Props) => {
           </div>
         </div>
 
-        {/* Column selector (if multiple missing columns) */}
-        {allColumns.length > 1 && (
-          <div className="mt-4">
-            <label className="text-sm font-medium">Zu korrigierendes Feld</label>
-            <Select value={selectedColumn} onValueChange={setSelectedColumn}>
-              <SelectTrigger className="mt-1.5 h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {allColumns.map((col) => (
-                  <SelectItem key={col} value={col}>
-                    {getFieldLabel(col)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* If only one column, show it as info */}
-        {allColumns.length === 1 && (
-          <div className="mt-4">
-            <p className="text-sm font-medium">
-              Fehlendes Feld: <span className="text-primary font-semibold">{getFieldLabel(selectedColumn)}</span>
-            </p>
-          </div>
-        )}
+        {/* Field label */}
+        <div className="mt-4">
+          <p className="text-sm font-medium">
+            Fehlendes Feld: <span className="text-primary font-semibold">{getFieldLabel(column)}</span>
+          </p>
+        </div>
 
         {/* Input */}
         <div className="mt-4">
           <label className="text-sm font-medium">Korrekturwert</label>
+
+          {format.hint && (
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Info className="h-3 w-3 shrink-0" />
+              <span>{format.hint}</span>
+            </div>
+          )}
+
           <Input
-            className="mt-1.5"
+            className={`mt-1.5 transition-colors ${isInvalid ? 'border-epa-danger ring-1 ring-epa-danger/50 focus-visible:ring-epa-danger' : ''}`}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder={`Wert für ${getFieldLabel(selectedColumn)} eingeben...`}
+            onChange={(e) => handleChange(e.target.value)}
+            onBlur={handleBlur}
+            placeholder={format.placeholder}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && value) onCorrect(error.id, value, '', 'save');
+              if (e.key === 'Enter') handleSubmit();
             }}
           />
+
+          {isInvalid && (
+            <p className="mt-1.5 text-xs text-epa-danger flex items-center gap-1">
+              <span className="font-medium">⚠</span> {validationError}
+            </p>
+          )}
         </div>
 
         {/* Actions */}
         <div className="mt-6 flex items-center gap-3">
           <Button
-            onClick={() => onCorrect(error.id, value, '', 'save')}
+            onClick={handleSubmit}
             disabled={!value}
             className="gradient-epa"
           >

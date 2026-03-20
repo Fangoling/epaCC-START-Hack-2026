@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { fieldLabels, tableLabels, type PatientSummary, type CaseRecord } from "@/data/mockData";
 import { toast } from "sonner";
 import { fetchCasesForPatient, fixRecord } from "@/lib/api";
+import { getFieldFormat } from "@/lib/fieldFormat";
 
 const tableConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   acData: { label: 'Pflegebewertungen', icon: Activity, color: 'text-epa-blue' },
@@ -107,27 +108,43 @@ interface ValueCardProps {
   mono?: boolean;
   anomaly?: string;
   refText?: string;
+  columnKey?: string;
   onSave?: (value: string) => Promise<void>;
 }
 
-const ValueCard = ({ label, value, unit, isBool, danger, mono, anomaly, refText, onSave }: ValueCardProps) => {
+const ValueCard = ({ label, value, unit, isBool, danger, mono, anomaly, refText, columnKey, onSave }: ValueCardProps) => {
   const isNull = value === null || value === undefined;
   const boolActive = isBool && (value === '1' || value === 1);
   const isDanger = danger && boolActive;
   const isAnomaly = !!anomaly;
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const format = columnKey ? getFieldFormat(columnKey) : null;
+
+  const handleChange = (v: string) => {
+    setEditValue(v);
+    if (format && v) setValidationError(format.validate(v));
+    else setValidationError(null);
+  };
 
   const handleSave = async () => {
     if (!editValue) return;
+    if (format) {
+      const err = format.validate(editValue);
+      if (err) { setValidationError(err); return; }
+    }
+    const dbValue = format ? format.transform(editValue) : editValue;
     if (onSave) {
       setSaving(true);
       try {
-        await onSave(editValue);
+        await onSave(dbValue);
         toast.success(`"${label}" korrigiert: ${editValue}`);
         setEditing(false);
         setEditValue('');
+        setValidationError(null);
       } catch {
         toast.error('Fehler beim Speichern');
       } finally {
@@ -137,6 +154,7 @@ const ValueCard = ({ label, value, unit, isBool, danger, mono, anomaly, refText,
       toast.success(`"${label}" korrigiert: ${editValue}`, { description: 'Korrektur wurde gespeichert.' });
       setEditing(false);
       setEditValue('');
+      setValidationError(null);
     }
   };
 
@@ -158,29 +176,38 @@ const ValueCard = ({ label, value, unit, isBool, danger, mono, anomaly, refText,
       )}
       <div className="mt-1 flex items-baseline gap-1.5">
         {editing ? (
-          <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
-            <Input
-              autoFocus
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && editValue) handleSave();
-                if (e.key === 'Escape') setEditing(false);
-              }}
-              className="h-7 text-xs px-2"
-              placeholder={`${label}...`}
-              disabled={saving}
-            />
-            <button
-              onClick={handleSave}
-              disabled={!editValue || saving}
-              className="p-1 text-epa-success hover:bg-epa-success/10 rounded disabled:opacity-30"
-            >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-            </button>
-            <button onClick={() => setEditing(false)} className="p-1 text-muted-foreground hover:bg-secondary rounded">
-              <X className="h-3.5 w-3.5" />
-            </button>
+          <div className="w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1">
+              <Input
+                autoFocus
+                value={editValue}
+                onChange={(e) => handleChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Escape') { setEditing(false); setValidationError(null); }
+                }}
+                className={`h-7 text-xs px-2 ${validationError ? 'border-epa-danger ring-1 ring-epa-danger/50' : ''}`}
+                placeholder={format?.placeholder || `${label}...`}
+                title={format?.hint || undefined}
+                disabled={saving}
+              />
+              <button
+                onClick={handleSave}
+                disabled={!editValue || saving}
+                className="p-1 text-epa-success hover:bg-epa-success/10 rounded disabled:opacity-30"
+              >
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              </button>
+              <button onClick={() => { setEditing(false); setValidationError(null); }} className="p-1 text-muted-foreground hover:bg-secondary rounded">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {format?.hint && !validationError && (
+              <p className="mt-0.5 text-[9px] text-muted-foreground">{format.hint}</p>
+            )}
+            {validationError && (
+              <p className="mt-0.5 text-[9px] text-epa-danger">⚠ {validationError}</p>
+            )}
           </div>
         ) : isNull ? (
           <NullIndicator onEdit={() => setEditing(true)} />
@@ -245,6 +272,7 @@ const renderTableData = (
                     unit={lp.unit}
                     anomaly={anomaly}
                     refText={refText}
+                    columnKey={lp.value}
                     onSave={row.coId ? makeSaver(row.coId, lp.value) : undefined}
                   />
                 );
@@ -290,6 +318,7 @@ const renderTableData = (
                           value={row[f]}
                           anomaly={anomaly}
                           refText={refText}
+                          columnKey={f}
                           onSave={row.coId ? makeSaver(row.coId, f) : undefined}
                         />
                       );
@@ -331,6 +360,7 @@ const renderTableData = (
                   unit={f.unit}
                   isBool={f.isBool}
                   danger={f.danger}
+                  columnKey={f.key}
                   onSave={row.coId ? makeSaver(row.coId, f.key) : undefined}
                 />
               ))}
@@ -360,6 +390,7 @@ const renderTableData = (
                   unit={f.unit}
                   isBool={f.isBool}
                   danger={f.danger}
+                  columnKey={f.key}
                   onSave={row.coId ? makeSaver(row.coId, f.key) : undefined}
                 />
               ))}
@@ -427,6 +458,7 @@ const renderTableData = (
                   label={fieldLabels[f] || f}
                   value={val}
                   mono={f.includes('icd10') || f.includes('ops')}
+                  columnKey={f}
                   onSave={row.coId ? makeSaver(row.coId, f) : undefined}
                 />
               );
@@ -451,6 +483,7 @@ const renderTableData = (
                 key={f}
                 label={fieldLabels[f] || f}
                 value={val}
+                columnKey={f}
                 onSave={row.coId ? makeSaver(row.coId, f) : undefined}
               />
             );
@@ -502,6 +535,10 @@ const PatientDetailView = ({ patient, apiAvailable }: Props) => {
   const handleFix = async (tableKey: string, rowId: number, columnName: string, value: string) => {
     const dbTable = KEY_TO_TABLE[tableKey] || tableKey;
     await fixRecord(dbTable, rowId, columnName, value);
+    // Re-fetch to update the UI immediately after a successful correction
+    fetchCasesForPatient(patient.patientId)
+      .then((cases) => setPatientCases(cases))
+      .catch(() => {});
   };
 
   if (loading) {

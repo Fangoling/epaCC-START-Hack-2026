@@ -187,7 +187,6 @@ const DataQualityDashboard = ({ errors }: Props) => {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold tabular-nums">{tableMetrics.total.toLocaleString()}</span>
-                        <span className="text-[10px] text-muted-foreground w-8 text-right">{pct}%</span>
                       </div>
                     </div>
                     <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
