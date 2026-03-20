@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { AlertTriangle, CheckCircle2, Search, ShieldCheck, FileText, BarChart3, Activity, FlaskConical, Stethoscope, Smartphone, HeartPulse, Pill, CircleSlash, ChevronRight, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Search, ShieldCheck, FileText, Activity, FlaskConical, Stethoscope, Smartphone, HeartPulse, Pill, CircleSlash, ChevronRight, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { tableLabels, type DataError } from "@/data/mockData";
@@ -103,7 +103,7 @@ const DataQualityDashboard = ({ errors }: Props) => {
   return (
     <div className="space-y-5 animate-fade-in">
       {/* KPI Row */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4 shadow-epa">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-epa-info/10">
@@ -134,17 +134,6 @@ const DataQualityDashboard = ({ errors }: Props) => {
             <div>
               <p className="text-xl font-bold">{openIssues}</p>
               <p className="text-[11px] text-muted-foreground">Offene Fehler</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4 shadow-epa">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-              <BarChart3 className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <p className="text-xl font-bold">{metricsLoading ? '…' : `${overallCompleteness}%`}</p>
-              <p className="text-[11px] text-muted-foreground">Genauigkeit</p>
             </div>
           </div>
         </div>
@@ -272,13 +261,13 @@ const DataQualityDashboard = ({ errors }: Props) => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-sm font-semibold truncate block">{issue.field}</span>
-                    <p className="text-xs text-muted-foreground truncate">{issue.description}</p>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-[11px] text-muted-foreground/80">{issue.patientId}</span>
                       <span className="text-[10px] text-muted-foreground/50">·</span>
                       <span className="text-[11px] text-muted-foreground/60 truncate">{issue.source}</span>
                     </div>
                   </div>
+                  <span className="shrink-0 rounded-full bg-epa-warning/15 px-2 py-0.5 text-[10px] font-medium text-epa-warning">Fehlend</span>
                   <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-foreground/60 transition-colors shrink-0" />
                 </div>
               ))}
