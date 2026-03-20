@@ -81,6 +81,15 @@ const device1HzFields = [
   { key: 'coImpact_magnitude_g', label: 'Aufprallstärke', unit: 'g' },
 ];
 
+// --- Field sets for "remaining fields" catch-all ---
+const SKIP_FIELDS = new Set(['coId', 'coCaseId']);
+const LAB_SHOWN = new Set(['coSpecimen_datetime', ...labValuePairs.flatMap((lp) => [lp.value, lp.flag])]);
+const AC_SHOWN = new Set([...acDataGroups.flatMap((g) => g.fields), 'coE0I0004', 'coE3I0889', 'coLastAssessment']);
+const DEVICE_MOTION_SHOWN = new Set(['coTimestamp', ...deviceMotionFields.map((f) => f.key)]);
+const DEVICE_1HZ_SHOWN = new Set(['coTimestamp', 'coDevice_id', 'coEvent_id', ...device1HzFields.map((f) => f.key)]);
+const NURSING_SHOWN = new Set(['coWard', 'coReport_date', 'coShift', 'coNursing_note_free_text']);
+const MED_SHOWN = new Set(['coRecord_type', 'coEncounter_id', 'coAdmission_datetime', 'coDischarge_datetime', 'coOrder_id', 'coMedication_code_atc', 'coMedication_name', 'coRoute', 'coDose', 'coDose_unit', 'coFrequency', 'coOrder_start_datetime', 'coOrder_stop_datetime', 'coIs_prn_0_1', 'coIndication', 'prescriber_role', 'order_status', 'administration_datetime', 'administered_dose', 'administered_unit', 'administration_status', 'note']);
+
 // --- Sub-components ---
 
 const RefRange = ({ text }: { text: string }) => (
@@ -229,6 +238,32 @@ const ValueCard = ({ label, value, unit, isBool, danger, mono, anomaly, refText,
   );
 };
 
+// --- Remaining fields catch-all renderer ---
+function renderRemainingFields(
+  row: any,
+  shown: Set<string>,
+  makeSaver: (rowId: number, col: string) => (val: string) => Promise<void>
+) {
+  const remaining = Object.keys(row).filter((k) => !SKIP_FIELDS.has(k) && !shown.has(k));
+  if (remaining.length === 0) return null;
+  return (
+    <div className="mt-3">
+      <p className="mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Weitere Felder</p>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+        {remaining.map((f) => (
+          <ValueCard
+            key={f}
+            label={fieldLabels[f] || f}
+            value={row[f]}
+            columnKey={f}
+            onSave={row.coId ? makeSaver(row.coId, f) : undefined}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // --- Table rendering ---
 
 const renderTableData = (
@@ -278,6 +313,7 @@ const renderTableData = (
                 );
               })}
             </div>
+            {renderRemainingFields(row, LAB_SHOWN, makeSaver)}
           </div>
         ))}
       </div>
@@ -339,6 +375,7 @@ const renderTableData = (
                 <p className="text-sm font-medium">{row.coE3I0889}</p>
               </div>
             )}
+            {renderRemainingFields(row, AC_SHOWN, makeSaver)}
           </div>
         ))}
       </div>
@@ -365,6 +402,7 @@ const renderTableData = (
                 />
               ))}
             </div>
+            {renderRemainingFields(row, DEVICE_MOTION_SHOWN, makeSaver)}
           </div>
         ))}
       </div>
@@ -395,6 +433,7 @@ const renderTableData = (
                 />
               ))}
             </div>
+            {renderRemainingFields(row, DEVICE_1HZ_SHOWN, makeSaver)}
           </div>
         ))}
       </div>
@@ -412,6 +451,7 @@ const renderTableData = (
               <Badge variant="secondary" className="text-[10px]">{row.coShift}</Badge>
             </div>
             <p className="text-sm leading-relaxed">{row.coNursing_note_free_text || <NullIndicator />}</p>
+            {renderRemainingFields(row, NURSING_SHOWN, makeSaver)}
           </div>
         ))}
       </div>
@@ -437,6 +477,7 @@ const renderTableData = (
               <span>Verabreichung: <strong className="text-foreground">{row.administration_status || '–'}</strong></span>
             </div>
             {row.note && <p className="mt-2 text-xs text-muted-foreground italic">📝 {row.note}</p>}
+            {renderRemainingFields(row, MED_SHOWN, makeSaver)}
           </div>
         ))}
       </div>
@@ -445,24 +486,28 @@ const renderTableData = (
 
   if (tableKey === 'icd10Data') {
     const icdFields = ['coWard', 'coAdmission_date', 'coDischarge_date', 'coLength_of_stay_days', 'coPrimary_icd10_code', 'coPrimary_icd10_description_en', 'coSecondary_icd10_codes', 'cpSecondary_icd10_descriptions_en', 'coOps_codes', 'ops_descriptions_en'];
+    const icdShown = new Set(icdFields);
     return (
       <div className="space-y-2">
         {data.map((row: any, i: number) => (
-          <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {icdFields.map((f) => {
-              const val = row[f];
-              if (val === undefined) return null;
-              return (
-                <ValueCard
-                  key={f}
-                  label={fieldLabels[f] || f}
-                  value={val}
-                  mono={f.includes('icd10') || f.includes('ops')}
-                  columnKey={f}
-                  onSave={row.coId ? makeSaver(row.coId, f) : undefined}
-                />
-              );
-            })}
+          <div key={i} className="space-y-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {icdFields.map((f) => {
+                const val = row[f];
+                if (val === undefined) return null;
+                return (
+                  <ValueCard
+                    key={f}
+                    label={fieldLabels[f] || f}
+                    value={val}
+                    mono={f.includes('icd10') || f.includes('ops')}
+                    columnKey={f}
+                    onSave={row.coId ? makeSaver(row.coId, f) : undefined}
+                  />
+                );
+              })}
+            </div>
+            {renderRemainingFields(row, icdShown, makeSaver)}
           </div>
         ))}
       </div>
@@ -470,7 +515,7 @@ const renderTableData = (
   }
 
   // Generic fallback
-  const fields = Object.keys(data[0]).filter((k) => k !== 'coId' && k !== 'coCaseId');
+  const fields = Object.keys(data[0]).filter((k) => !SKIP_FIELDS.has(k));
   return (
     <div className="space-y-2">
       {data.map((row: any, i: number) => (
